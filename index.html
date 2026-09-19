@@ -8,18 +8,41 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body {
-      background-color: #0f172a !important;
-      color: #f8fafc !important;
+      background-color: #0f172a;
+      color: #f8fafc;
       font-family: system-ui, -apple-system, sans-serif;
       margin: 0;
-      padding-bottom: 4rem;
+      padding: 1rem 0 4rem 0;
       min-height: 100vh;
+    }
+    .btn {
+      padding: 0.6rem 1rem;
+      border-radius: 0.5rem;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .btn-primary { background-color: #f59e0b; color: #020617; }
+    .btn-success { background-color: #10b981; color: #020617; }
+    .btn-secondary { background-color: #334155; color: #f8fafc; }
+    .btn-danger { background-color: #9f1239; color: #fecdd3; }
+    .card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
     }
     #reader video {
       object-fit: cover !important;
-      border-radius: 0.75rem;
+      border-radius: 0.5rem;
       width: 100% !important;
-      max-height: 200px;
+      max-height: 220px;
     }
   </style>
 
@@ -28,76 +51,82 @@
 </head>
 <body>
 
-  <!-- Logger de Errores Visuales -->
-  <div id="debugBox" style="display:none; background:#7f1d1d; color:#fff; padding:10px; font-size:12px; font-family:monospace; position:fixed; top:0; left:0; right:0; z-index:99999;"></div>
+  <!-- Barra de Advertencia de Protocolo -->
+  <div id="protocolWarning" style="display:none;" class="bg-amber-500/10 border border-amber-500/40 p-3 mx-4 rounded-xl mb-4 text-xs text-amber-300">
+    ⚠️ <strong>Modo Local Detectado (`file://`):</strong> La cámara en vivo puede ser bloqueada por el navegador por falta de HTTPS. Usa el botón <strong>"📷 Tomar Foto a Código"</strong> como alternativa o ingresa los dígitos manualmente.
+  </div>
 
   <!-- Header -->
-  <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-30 shadow-md">
-    <div class="max-w-xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <span class="text-2xl">🏪</span>
-        <div>
-          <h1 class="font-bold text-base text-amber-400 leading-tight">Abarrotes Reyes Magos</h1>
-          <p class="text-[11px] text-slate-400">Punto de Venta <span class="text-emerald-400 font-bold">[v4.1 INTELIGENTE]</span></p>
-        </div>
+  <header class="max-w-xl mx-auto px-4 mb-4 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-2xl">🏪</span>
+      <div>
+        <h1 class="font-bold text-base text-amber-400 leading-tight">Abarrotes Reyes Magos</h1>
+        <p class="text-[11px] text-slate-400">Punto de Venta <span class="text-emerald-400 font-bold">[v4.2]</span></p>
       </div>
-      <button type="button" onclick="openInventoryModal()" id="statusBadge" class="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-3 py-1 rounded-full text-amber-400 font-bold font-mono active:scale-95 transition">
-        0 Prod.
-      </button>
     </div>
+    <button type="button" onclick="openInventoryModal()" id="statusBadge" class="btn btn-secondary text-xs">
+      0 Prod.
+    </button>
   </header>
 
-  <main class="max-w-xl mx-auto px-4 py-4 space-y-4">
+  <main class="max-w-xl mx-auto px-4 space-y-4">
 
-    <!-- SECCIÓN CÁMARA & BÚSQUEDA -->
-    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
+    <!-- LECTOR Y CÁMARA -->
+    <div class="card space-y-3">
       <div class="flex items-center justify-between">
-        <h2 class="font-semibold text-slate-200 text-xs uppercase tracking-wider">Escáner / Lector</h2>
-        <button type="button" id="toggleCamBtn" onclick="toggleCamera()" class="px-3.5 py-2 bg-amber-500 text-slate-950 text-xs font-bold rounded-lg active:scale-95 transition">
+        <h2 class="font-semibold text-slate-200 text-xs uppercase tracking-wider">Escáner / Entrada</h2>
+        <button type="button" id="toggleCamBtn" onclick="toggleCamera()" class="btn btn-primary">
           Encender Cámara
         </button>
       </div>
       
       <div class="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950 min-h-[160px] flex items-center justify-center">
         <div id="reader" class="w-full min-h-[160px]"></div>
-        <div id="scanner-placeholder" class="p-6 text-center text-xs text-slate-400 absolute">
-          📷 Cámara apagada.<br>Toca "Encender Cámara" para activar.
+        <div id="scanner-placeholder" class="p-4 text-center text-xs text-slate-400 absolute">
+          📷 Cámara en vivo apagada.
         </div>
+      </div>
+
+      <!-- Opción Fallback: Foto Nativa -->
+      <div class="flex gap-2">
+        <label class="btn btn-secondary flex-1 cursor-pointer text-center text-xs">
+          📷 Capturar Foto de Código
+          <input type="file" id="fileQrInput" accept="image/*" capture="environment" class="hidden" onchange="scanImageFile(this)">
+        </label>
       </div>
 
       <!-- Entrada Manual -->
       <form onsubmit="runManualSearch(event)" class="flex gap-2 pt-1">
-        <input type="text" inputmode="numeric" pattern="[0-9]*" id="manualBarcodeScan" placeholder="Escribir código de barras..." class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
-        <button type="submit" class="bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2 rounded-lg text-xs font-bold active:scale-95 transition">
-          + Sumar
+        <input type="text" inputmode="numeric" id="manualBarcodeScan" placeholder="Escribir código de barras..." class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+        <button type="submit" class="btn btn-primary">
+          + Agregar
         </button>
       </form>
     </div>
 
-    <!-- TICKET DE COMPRA ACTUAL (CARRITO) -->
-    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3 shadow-lg">
+    <!-- TICKET DE VENTA -->
+    <div class="card space-y-3 shadow-lg">
       <div class="flex justify-between items-center border-b border-slate-700 pb-2">
         <h2 class="font-bold text-slate-200 text-sm">🛒 Ticket de Compra</h2>
-        <button type="button" onclick="clearCart()" class="text-[11px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-rose-300 font-semibold">
+        <button type="button" onclick="clearCart()" class="text-[11px] bg-slate-700 px-2 py-1 rounded text-rose-300 font-semibold">
           Vaciar Ticket
         </button>
       </div>
 
-      <!-- Lista de Artículos -->
-      <div id="cartList" class="space-y-2 text-xs divide-y divide-slate-700/50 min-h-[80px]">
-        <p class="text-slate-500 text-center py-6">Escanea productos para iniciar la venta.</p>
+      <div id="cartList" class="space-y-2 text-xs divide-y divide-slate-700/50 min-h-[60px]">
+        <p class="text-slate-500 text-center py-4">Escanea o ingresa productos.</p>
       </div>
 
-      <!-- TOTAL Y COBRO -->
       <div class="border-t-2 border-slate-700 pt-3 space-y-3">
         <div class="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-800">
-          <span class="text-sm font-bold text-slate-300 uppercase">Total a Cobrar:</span>
+          <span class="text-sm font-bold text-slate-300 uppercase">Total:</span>
           <span id="cartTotal" class="text-emerald-400 text-3xl font-black font-mono">$0.00</span>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Efectivo Recibido ($)</label>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Efectivo ($)</label>
             <input type="number" id="payAmount" oninput="calculateChange()" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-base text-slate-100 font-bold focus:outline-none focus:border-emerald-500">
           </div>
           <div>
@@ -108,29 +137,23 @@
           </div>
         </div>
 
-        <button type="button" onclick="completeSale()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3.5 rounded-xl active:scale-95 transition text-sm uppercase tracking-wider shadow-lg shadow-emerald-950/50">
-          ✓ Finalizar y Cobrar Venta
+        <button type="button" onclick="completeSale()" class="w-full btn btn-success py-3.5 text-sm uppercase tracking-wider">
+          ✓ Finalizar y Cobrar
         </button>
       </div>
     </div>
 
-    <!-- ACCIONES Y GESTIÓN DE INVENTARIO -->
-    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-2">
-      <div class="flex justify-between items-center">
-        <span class="text-xs text-slate-400 font-semibold">Administración:</span>
-        <button type="button" onclick="openInventoryModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-bold active:scale-95 transition flex items-center gap-1">
-          📋 Ver Catálogo Completo
-        </button>
-      </div>
-      <div class="flex justify-end gap-2 pt-1 border-t border-slate-700/50">
-        <button type="button" onclick="exportJSON()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-slate-200 text-xs font-semibold">Exportar Copia</button>
-        <button type="button" onclick="clearAllData()" class="bg-rose-950/60 text-rose-300 hover:bg-rose-900/60 px-3 py-1.5 rounded text-xs font-semibold border border-rose-800/40">Borrar DB</button>
-      </div>
+    <!-- ADMINISTRACIÓN -->
+    <div class="card flex justify-between items-center">
+      <span class="text-xs text-slate-400 font-semibold">Inventario:</span>
+      <button type="button" onclick="openInventoryModal()" class="btn btn-primary">
+        📋 Catálogo Completo
+      </button>
     </div>
 
   </main>
 
-  <!-- MODAL / ALTA RÁPIDA DE PRODUCTO NUEVO -->
+  <!-- MODAL: NUEVO PRODUCTO -->
   <div id="newProductModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-800 border border-amber-500/50 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
       <div class="flex justify-between items-center">
@@ -142,85 +165,72 @@
 
       <div>
         <label class="block text-xs text-slate-400 mb-1">Nombre del Producto</label>
-        <input type="text" id="newProdName" placeholder="Ej. Coca Cola 600ml" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+        <input type="text" id="newProdName" placeholder="Ej. Sabritas Sal 45g" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none">
       </div>
 
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block text-xs text-slate-400 mb-1">Precio Venta ($)</label>
-          <input type="number" step="0.5" id="newProdPrice" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-emerald-400 font-bold focus:outline-none focus:border-amber-500">
+          <input type="number" step="0.5" id="newProdPrice" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-emerald-400 font-bold">
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Stock Inicial</label>
-          <input type="number" id="newProdStock" value="10" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+          <label class="block text-xs text-slate-400 mb-1">Stock</label>
+          <input type="number" id="newProdStock" value="10" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100">
         </div>
       </div>
 
-      <button type="button" onclick="saveAndAddProduct()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl active:scale-95 transition text-xs uppercase">
-        Guardar y Sumar a Ticket
+      <button type="button" onclick="saveAndAddProduct()" class="w-full btn btn-primary py-2.5 uppercase">
+        Guardar y Sumar
       </button>
     </div>
   </div>
 
-  <!-- MODAL / CONSULTA Y EDICIÓN DE INVENTARIO COMPLETO -->
+  <!-- MODAL: CATÁLOGO COMPLETO -->
   <div id="inventoryModal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 w-full max-w-md h-[80vh] flex flex-col shadow-2xl space-y-3">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 w-full max-w-md h-[80vh] flex flex-col space-y-3">
       <div class="flex justify-between items-center border-b border-slate-700 pb-2">
         <div>
           <h3 class="font-bold text-amber-400 text-base">📋 Catálogo de Productos</h3>
-          <p class="text-[11px] text-slate-400" id="invTotalCount">0 productos registrados</p>
+          <p class="text-[11px] text-slate-400" id="invTotalCount">0 productos</p>
         </div>
-        <button type="button" onclick="closeInventoryModal()" class="text-slate-400 hover:text-slate-100 text-lg font-bold px-2">✕</button>
+        <button type="button" onclick="closeInventoryModal()" class="text-slate-400 text-lg font-bold">✕</button>
       </div>
 
-      <!-- Buscador interno -->
-      <input type="text" id="invSearchInput" oninput="renderInventoryList()" placeholder="🔍 Buscar por nombre o código..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500">
+      <input type="text" id="invSearchInput" oninput="renderInventoryList()" placeholder="🔍 Buscar por nombre o código..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none">
 
-      <!-- Lista de productos -->
-      <div id="inventoryModalList" class="flex-1 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-700/40">
-        <!-- Render dinámico -->
-      </div>
+      <div id="inventoryModalList" class="flex-1 overflow-y-auto space-y-2 divide-y divide-slate-700/40 pr-1"></div>
 
-      <button type="button" onclick="closeInventoryModal()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-2.5 rounded-xl text-xs uppercase">
-        Cerrar Catálogo
+      <button type="button" onclick="closeInventoryModal()" class="w-full btn btn-secondary uppercase">
+        Cerrar
       </button>
     </div>
   </div>
 
   <script>
-    // Capturador de errores JS
-    window.onerror = function(msg, url, lineNo) {
-      const box = document.getElementById('debugBox');
-      if (box) {
-        box.style.display = 'block';
-        box.innerText = `⚠️ Error JS: ${msg} (Línea ${lineNo})`;
-      }
-      return false;
-    };
-
     const DB_KEY = 'reyes_magos_db_v4';
     let db = {};
     let cart = [];
     let html5QrCode = null;
     let isScanning = false;
-    let lastScanCode = null;
-    let lastScanTime = 0;
     let pendingBarcode = null;
 
     document.addEventListener("DOMContentLoaded", () => {
+      // Detección de protocolo seguro
+      if (window.location.protocol === 'file:') {
+        const warn = document.getElementById('protocolWarning');
+        if (warn) warn.style.display = 'block';
+      }
+
       try {
         db = JSON.parse(localStorage.getItem(DB_KEY)) || {};
-      } catch(e) {
-        db = {};
-      }
+      } catch(e) { db = {}; }
+
       updateBadge();
       renderCart();
     });
 
     function saveDB() {
-      try {
-        localStorage.setItem(DB_KEY, JSON.stringify(db));
-      } catch(e) {}
+      try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
       updateBadge();
     }
 
@@ -230,21 +240,6 @@
       if (badge) badge.innerText = `${count} Prod.`;
       const invCount = document.getElementById('invTotalCount');
       if (invCount) invCount.innerText = `${count} producto(s) en catálogo`;
-    }
-
-    function playBeep() {
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.type = "sine";
-        osc.frequency.value = 1200;
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.1);
-      } catch(e) {}
     }
 
     function runManualSearch(e) {
@@ -260,16 +255,6 @@
     function processBarcode(code) {
       if (!code) return;
 
-      const now = Date.now();
-      if (code === lastScanCode && (now - lastScanTime) < 1500) {
-        return;
-      }
-      lastScanCode = code;
-      lastScanTime = now;
-
-      if (navigator.vibrate) navigator.vibrate(60);
-      playBeep();
-
       if (db[code]) {
         addToCart(code);
       } else {
@@ -279,8 +264,24 @@
         document.getElementById('newProdPrice').value = '';
         document.getElementById('newProdStock').value = '10';
         document.getElementById('newProductModal').classList.remove('hidden');
-        setTimeout(() => document.getElementById('newProdName').focus(), 150);
       }
+    }
+
+    function scanImageFile(input) {
+      if (!input.files || input.files.length === 0) return;
+      const file = input.files[0];
+      
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("reader");
+      }
+
+      html5QrCode.scanFile(file, true)
+        .then(decodedText => {
+          processBarcode(decodedText);
+        })
+        .catch(err => {
+          alert("No se pudo detectar un código claro en la imagen. Intenta acercar la foto.");
+        });
     }
 
     function saveAndAddProduct() {
@@ -289,12 +290,10 @@
       const price = parseFloat(document.getElementById('newProdPrice').value) || 0;
       const stock = parseInt(document.getElementById('newProdStock').value) || 0;
 
-      if (!name) return alert("Ingresa un nombre para el producto.");
-      if (price <= 0) return alert("Ingresa un precio mayor a $0.");
+      if (!name || price <= 0) return alert("Completa un nombre y precio válido.");
 
       db[pendingBarcode] = { name, price, stock };
       saveDB();
-
       addToCart(pendingBarcode);
       closeNewProductModal();
     }
@@ -321,47 +320,35 @@
 
       const keys = Object.keys(db);
       if (keys.length === 0) {
-        container.innerHTML = `<p class="text-slate-500 text-center py-8 text-xs">No hay productos guardados aún.</p>`;
+        container.innerHTML = `<p class="text-slate-500 text-center py-6">Catálogo vacío.</p>`;
         return;
       }
 
-      let matches = 0;
       keys.reverse().forEach(code => {
         const item = db[code];
-        const matchName = item.name ? item.name.toLowerCase().includes(query) : false;
-        const matchCode = code.includes(query);
-
-        if (query && !matchName && !matchCode) return;
-        matches++;
+        if (query && !item.name.toLowerCase().includes(query) && !code.includes(query)) return;
 
         container.innerHTML += `
           <div class="pt-2 pb-1 flex justify-between items-center">
-            <div class="pr-2">
+            <div>
               <p class="font-bold text-slate-100 text-xs">${item.name}</p>
               <p class="font-mono text-[10px] text-slate-400">${code}</p>
             </div>
             <div class="text-right flex items-center gap-2">
               <div>
-                <p class="text-emerald-400 font-bold text-xs">$${(item.price || 0).toFixed(2)}</p>
-                <p class="text-[10px] text-slate-400">Stock: <span class="font-bold text-slate-200">${item.stock || 0}</span></p>
+                <p class="text-emerald-400 font-bold text-xs">$${item.price.toFixed(2)}</p>
+                <p class="text-[10px] text-slate-400">Stock: ${item.stock}</p>
               </div>
-              <button type="button" onclick="editProductPrompt('${code}')" class="bg-slate-700 hover:bg-slate-600 p-1.5 rounded text-amber-400 text-xs font-bold">
-                ✏️
-              </button>
+              <button type="button" onclick="editProductPrompt('${code}')" class="bg-slate-700 p-1 rounded text-amber-400 text-xs">✏️</button>
             </div>
           </div>
         `;
       });
-
-      if (matches === 0) {
-        container.innerHTML = `<p class="text-slate-500 text-center py-8 text-xs">No se encontraron coincidencias para "${query}".</p>`;
-      }
     }
 
     function editProductPrompt(code) {
       const item = db[code];
       if (!item) return;
-
       const newName = prompt("Editar nombre:", item.name);
       if (newName === null) return;
       const newPrice = prompt("Editar precio ($):", item.price);
@@ -384,16 +371,11 @@
       const prod = db[code];
       if (!prod) return;
 
-      const existingIndex = cart.findIndex(item => item.code === code);
-      if (existingIndex > -1) {
-        cart[existingIndex].qty += 1;
+      const idx = cart.findIndex(item => item.code === code);
+      if (idx > -1) {
+        cart[idx].qty += 1;
       } else {
-        cart.push({
-          code: code,
-          name: prod.name,
-          price: prod.price,
-          qty: 1
-        });
+        cart.push({ code, name: prod.name, price: prod.price, qty: 1 });
       }
       renderCart();
     }
@@ -417,7 +399,7 @@
       let total = 0;
 
       if (cart.length === 0) {
-        container.innerHTML = `<p class="text-slate-500 text-center py-6">Escanea productos para iniciar la venta.</p>`;
+        container.innerHTML = `<p class="text-slate-500 text-center py-4">Escanea o ingresa productos.</p>`;
         document.getElementById('cartTotal').innerText = '$0.00';
         calculateChange();
         return;
@@ -431,12 +413,12 @@
           <div class="flex justify-between items-center pt-2">
             <div>
               <p class="font-bold text-slate-100 text-xs">${item.name}</p>
-              <p class="text-emerald-400 font-mono text-[11px]">$${item.price.toFixed(2)} x ${item.qty} = <span class="font-bold text-emerald-300">$${itemTotal.toFixed(2)}</span></p>
+              <p class="text-emerald-400 font-mono text-[11px]">$${item.price.toFixed(2)} x ${item.qty} = $${itemTotal.toFixed(2)}</p>
             </div>
             <div class="flex items-center gap-2">
-              <button type="button" onclick="updateQty(${index}, -1)" class="w-7 h-7 bg-slate-700 text-slate-200 rounded-lg font-bold hover:bg-slate-600 active:scale-95 text-sm">-</button>
-              <span class="font-mono text-xs w-5 text-center font-bold text-slate-100">${item.qty}</span>
-              <button type="button" onclick="updateQty(${index}, 1)" class="w-7 h-7 bg-slate-700 text-slate-200 rounded-lg font-bold hover:bg-slate-600 active:scale-95 text-sm">+</button>
+              <button type="button" onclick="updateQty(${index}, -1)" class="w-6 h-6 bg-slate-700 text-slate-200 rounded font-bold">-</button>
+              <span class="font-mono text-xs font-bold">${item.qty}</span>
+              <button type="button" onclick="updateQty(${index}, 1)" class="w-6 h-6 bg-slate-700 text-slate-200 rounded font-bold">+</button>
             </div>
           </div>
         `;
@@ -448,23 +430,79 @@
 
     function calculateChange() {
       const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-      const payInput = document.getElementById('payAmount');
-      const pay = parseFloat(payInput ? payInput.value : 0) || 0;
+      const pay = parseFloat(document.getElementById('payAmount').value) || 0;
       const changeDisplay = document.getElementById('changeAmount');
 
       if (!changeDisplay) return;
 
       if (total === 0) {
         changeDisplay.innerText = "$0.00";
-        changeDisplay.className = "w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-500 flex items-center font-mono";
+        changeDisplay.className = "w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-500 font-mono";
         return;
       }
 
       const change = pay - total;
       if (pay >= total) {
         changeDisplay.innerText = `$${change.toFixed(2)}`;
-        changeDisplay.className = "w-full bg-slate-950 border border-emerald-500/50 rounded-lg px-3 py-2 text-base font-bold text-emerald-400 flex items-center font-mono";
+        changeDisplay.className = "w-full bg-slate-950 border border-emerald-500/50 rounded-lg px-3 py-2 text-base font-bold text-emerald-400 font-mono";
       } else {
-        const falta = Math.abs(change);
-        changeDisplay.innerText = `Falta $${falta.toFixed(2)}`;
-        changeDisplay.className = "w-full bg-slate-950 border border-rose-500/50 rounded-lg 
+        changeDisplay.innerText = `Falta $${Math.abs(change).toFixed(2)}`;
+        changeDisplay.className = "w-full bg-slate-950 border border-rose-500/50 rounded-lg px-3 py-2 text-xs font-bold text-rose-400 font-mono";
+      }
+    }
+
+    function completeSale() {
+      if (cart.length === 0) return alert("Ticket vacío.");
+      const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      const pay = parseFloat(document.getElementById('payAmount').value) || 0;
+
+      if (pay < total) return alert(`Ingresa al menos $${total.toFixed(2)}.`);
+
+      cart.forEach(item => {
+        if (db[item.code]) db[item.code].stock = Math.max(0, db[item.code].stock - item.qty);
+      });
+
+      saveDB();
+      alert(`✅ ¡Venta Registrada!\n\nTotal: $${total.toFixed(2)}\nEfectivo: $${pay.toFixed(2)}\nCambio: $${(pay - total).toFixed(2)}`);
+      clearCart();
+    }
+
+    async function toggleCamera() {
+      const btn = document.getElementById('toggleCamBtn');
+      const placeholder = document.getElementById('scanner-placeholder');
+
+      if (typeof Html5Qrcode === 'undefined') {
+        return alert("Error al cargar la librería. Revisa la conexión a internet.");
+      }
+
+      if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+
+      if (isScanning) {
+        try {
+          await html5QrCode.stop();
+          isScanning = false;
+          btn.innerText = "Encender Cámara";
+          if (placeholder) placeholder.style.display = 'block';
+        } catch (err) {}
+      } else {
+        try {
+          if (placeholder) placeholder.style.display = 'none';
+
+          await html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 220, height: 130 } },
+            (decodedText) => processBarcode(decodedText),
+            () => {}
+          );
+
+          isScanning = true;
+          btn.innerText = "Apagar Cámara";
+        } catch (err) {
+          if (placeholder) placeholder.style.display = 'block';
+          alert("El navegador bloqueó la cámara en vivo. Usa el botón '📷 Capturar Foto de Código' abajo.");
+        }
+      }
+    }
+  </script>
+</body>
+</html>
