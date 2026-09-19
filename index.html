@@ -28,7 +28,7 @@
 </head>
 <body>
 
-  <!-- Logger de Errores Visuales en Pantalla -->
+  <!-- Box visual de diagnóstico de errores -->
   <div id="debugBox" style="display:none; background:#7f1d1d; color:#fff; padding:10px; font-size:12px; font-family:monospace; position:fixed; top:0; left:0; right:0; z-index:99999;"></div>
 
   <!-- Header -->
@@ -38,7 +38,7 @@
         <span class="text-2xl">🏪</span>
         <div>
           <h1 class="font-bold text-base text-amber-400 leading-tight">Abarrotes Reyes Magos</h1>
-          <p class="text-[11px] text-slate-400">POS Móvil <span class="text-amber-500 font-bold">[v3.0 ONLINE]</span></p>
+          <p class="text-[11px] text-slate-400">POS Móvil <span class="text-amber-500 font-bold">[v3.2 ONLINE]</span></p>
         </div>
       </div>
       <div id="statusBadge" class="text-[11px] bg-slate-700 px-2.5 py-1 rounded-full text-slate-300 font-mono">0 Prod.</div>
@@ -56,8 +56,8 @@
         </button>
       </div>
       
-      <div class="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950 min-h-[160px] flex items-center justify-center">
-        <div id="reader" class="w-full"></div>
+      <div class="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950 min-h-[180px] flex items-center justify-center">
+        <div id="reader" class="w-full min-h-[180px]"></div>
         <div id="scanner-placeholder" class="p-6 text-center text-xs text-slate-400 absolute">
           📷 Cámara apagada.<br>Toca "Encender Cámara" para activar.
         </div>
@@ -76,16 +76,17 @@
     <section id="sec-scan" class="space-y-4">
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
         <label class="block text-xs font-semibold text-slate-300">Buscar / Alta Manual</label>
-        <div class="flex gap-2">
+        
+        <form onsubmit="runManualSearch(event)" class="flex gap-2">
           <input type="text" inputmode="numeric" pattern="[0-9]*" id="manualBarcodeScan" placeholder="Código de barras..." class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
-          <button type="button" onclick="runManualSearch()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-xs font-semibold text-slate-200 active:scale-95 transition">
+          <button type="submit" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-xs font-semibold text-slate-200 active:scale-95 transition">
             Buscar
           </button>
-        </div>
+        </form>
       </div>
 
-      <!-- Ficha de Producto (Forzado por JS directo) -->
-      <div id="productCard" style="display: none;" class="bg-slate-800 p-4 rounded-xl border border-amber-500/50 space-y-3">
+      <!-- Ficha de Producto -->
+      <div id="productCard" class="hidden bg-slate-800 p-4 rounded-xl border border-amber-500/50 space-y-3">
         <div class="flex justify-between items-center">
           <span id="barcodeDisplay" class="text-xs font-mono bg-slate-900 px-2 py-1 rounded text-amber-400 border border-slate-700">---</span>
           <span id="sourceTag" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-slate-700 text-slate-300">NUEVO</span>
@@ -119,15 +120,15 @@
     </section>
 
     <!-- PESTAÑA 2: VENTA (POS) -->
-    <section id="sec-pos" style="display: none;" class="space-y-4">
+    <section id="sec-pos" class="hidden space-y-4">
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
         <label class="block text-xs font-semibold text-slate-300">Agregar Código Manual a Venta</label>
-        <div class="flex gap-2">
+        <form onsubmit="runPOSManual(event)" class="flex gap-2">
           <input type="text" inputmode="numeric" pattern="[0-9]*" id="manualBarcodePOS" placeholder="Código de barras..." class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
-          <button type="button" onclick="runPOSManual()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-xs font-bold text-slate-100 active:scale-95 transition">
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-xs font-bold text-slate-100 active:scale-95 transition">
             + Agregar
           </button>
-        </div>
+        </form>
       </div>
 
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
@@ -165,7 +166,7 @@
     </section>
 
     <!-- PESTAÑA 3: STOCK -->
-    <section id="sec-inventory" style="display: none;" class="space-y-4">
+    <section id="sec-inventory" class="hidden space-y-4">
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
         <h2 class="font-bold text-slate-200 text-sm">Inventario Registrado</h2>
         <div id="inventoryList" class="space-y-2 text-xs"></div>
@@ -173,7 +174,7 @@
     </section>
 
     <!-- PESTAÑA 4: DATOS -->
-    <section id="sec-data" style="display: none;" class="space-y-4">
+    <section id="sec-data" class="hidden space-y-4">
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
         <h2 class="font-bold text-slate-200 text-sm">Base de Datos</h2>
         <button type="button" onclick="exportJSON()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 p-2.5 rounded-lg text-xs font-semibold">
@@ -188,7 +189,6 @@
   </main>
 
   <script>
-    // Capturador de errores en vivo
     window.onerror = function(msg, url, lineNo) {
       const box = document.getElementById('debugBox');
       if (box) {
@@ -227,7 +227,8 @@
       if (badge) badge.innerText = `${Object.keys(db).length} Prod.`;
     }
 
-    function runManualSearch() {
+    function runManualSearch(e) {
+      if (e) e.preventDefault();
       const input = document.getElementById('manualBarcodeScan');
       if (!input) return;
       const code = input.value.trim();
@@ -238,7 +239,8 @@
       processBarcode(code);
     }
 
-    function runPOSManual() {
+    function runPOSManual(e) {
+      if (e) e.preventDefault();
       const input = document.getElementById('manualBarcodePOS');
       if (!input) return;
       const code = input.value.trim();
@@ -256,27 +258,34 @@
         currentBarcode = code;
         const pCard = document.getElementById('productCard');
         
-        // Forzado directo mediante estilo en línea
         if (pCard) {
+          pCard.classList.remove('hidden');
           pCard.style.display = 'block';
           pCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         document.getElementById('barcodeDisplay').innerText = code;
 
+        const nameInput = document.getElementById('prodName');
+        const priceInput = document.getElementById('prodPrice');
+        const stockInput = document.getElementById('prodStock');
+        const sourceTag = document.getElementById('sourceTag');
+
         if (db[code]) {
-          document.getElementById('prodName').value = db[code].name || '';
-          document.getElementById('prodPrice').value = db[code].price !== undefined ? db[code].price : '';
-          document.getElementById('prodStock').value = db[code].stock !== undefined ? db[code].stock : 0;
-          document.getElementById('sourceTag').innerText = "REGISTRADO";
-          document.getElementById('sourceTag').className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-900 text-emerald-300";
+          nameInput.value = db[code].name || '';
+          priceInput.value = db[code].price !== undefined ? db[code].price : '';
+          stockInput.value = db[code].stock !== undefined ? db[code].stock : 0;
+          sourceTag.innerText = "REGISTRADO";
+          sourceTag.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-900 text-emerald-300";
         } else {
-          document.getElementById('prodName').value = '';
-          document.getElementById('prodPrice').value = '';
-          document.getElementById('prodStock').value = '10';
-          document.getElementById('sourceTag').innerText = "NUEVO";
-          document.getElementById('sourceTag').className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-900 text-amber-300";
+          nameInput.value = '';
+          priceInput.value = '';
+          stockInput.value = '10';
+          sourceTag.innerText = "NUEVO";
+          sourceTag.className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-900 text-amber-300";
         }
+
+        setTimeout(() => nameInput.focus(), 100);
       }
     }
 
@@ -422,13 +431,16 @@
       ['scan', 'pos', 'inventory', 'data'].forEach(t => {
         const sec = document.getElementById(`sec-${t}`);
         const btn = document.getElementById(`tab-${t}`);
-        if (sec) sec.style.display = 'none';
+        if (sec) sec.classList.add('hidden');
         if (btn) btn.className = "py-2.5 text-center rounded-lg text-slate-300 hover:bg-slate-700";
       });
 
       const activeSec = document.getElementById(`sec-${tab}`);
       const activeBtn = document.getElementById(`tab-${tab}`);
-      if (activeSec) activeSec.style.display = 'block';
+      if (activeSec) {
+        activeSec.classList.remove('hidden');
+        activeSec.style.display = 'block';
+      }
       if (activeBtn) activeBtn.className = "py-2.5 text-center rounded-lg bg-amber-500 text-slate-950 font-bold";
 
       if (tab === 'inventory') renderInventory();
@@ -456,5 +468,4 @@
               <p class="font-bold text-slate-200 text-xs">${item.name}</p>
               <p class="font-mono text-[10px] text-slate-500">${code}</p>
             </div>
-            <div class="text-right">
-              <p class="text-emerald-400 font-bold text-xs">$${(item.pr
+            <div class="tex
