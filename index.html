@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Abarrotes Reyes Magos - POS</title>
   
-  <!-- CSS Base de respaldo para evitar pantalla blanca si falla el CDN -->
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body {
@@ -13,7 +12,7 @@
       color: #f8fafc !important;
       font-family: system-ui, -apple-system, sans-serif;
       margin: 0;
-      padding-bottom: 2.5rem;
+      padding-bottom: 3rem;
       min-height: 100vh;
     }
     #reader video {
@@ -24,7 +23,6 @@
     }
   </style>
 
-  <!-- Tailwind CSS & Html5Qrcode -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 </head>
@@ -37,7 +35,7 @@
         <span class="text-2xl">🏪</span>
         <div>
           <h1 class="font-bold text-base text-amber-400 leading-tight">Abarrotes Reyes Magos</h1>
-          <p class="text-[11px] text-slate-400">Control de Precios & Inventario Móvil</p>
+          <p class="text-[11px] text-slate-400">Control de Precios & Inventario</p>
         </div>
       </div>
       <div id="statusBadge" class="text-[11px] bg-slate-700 px-2.5 py-1 rounded-full text-slate-300 font-mono">0 Prod.</div>
@@ -46,7 +44,7 @@
 
   <main class="max-w-xl mx-auto px-4 py-4 space-y-4">
 
-    <!-- CÁMARA DE ESCANEO -->
+    <!-- ESCÁNER CÁMARA -->
     <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
       <div class="flex items-center justify-between">
         <h2 class="font-semibold text-slate-200 text-xs uppercase tracking-wider">Cámara de Escaneo</h2>
@@ -58,12 +56,12 @@
       <div class="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950 min-h-[160px] flex items-center justify-center">
         <div id="reader" class="w-full"></div>
         <div id="scanner-placeholder" class="p-6 text-center text-xs text-slate-400 absolute">
-          📷 Cámara apagada.<br>Toca "Encender Cámara" para escanear en Venta o Registro.
+          📷 Cámara apagada.<br>Toca "Encender Cámara" para activar.
         </div>
       </div>
     </div>
 
-    <!-- Navegación -->
+    <!-- Navegación Tab -->
     <nav class="grid grid-cols-4 bg-slate-800 p-1 rounded-xl border border-slate-700 text-xs font-medium gap-1">
       <button onclick="switchTab('scan')" id="tab-scan" class="py-2.5 text-center rounded-lg bg-amber-500 text-slate-950 font-bold">Escáner</button>
       <button onclick="switchTab('pos')" id="tab-pos" class="py-2.5 text-center rounded-lg text-slate-300 hover:bg-slate-700">Venta</button>
@@ -71,18 +69,19 @@
       <button onclick="switchTab('data')" id="tab-data" class="py-2.5 text-center rounded-lg text-slate-300 hover:bg-slate-700">Datos</button>
     </nav>
 
-    <!-- PESTAÑA 1: ESCÁNER / REGISTRO -->
+    <!-- SECCIÓN 1: ESCÁNER / BÚSQUEDA -->
     <section id="sec-scan" class="space-y-4">
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
         <label class="block text-xs font-semibold text-slate-300">Buscar / Alta Manual</label>
-        <div class="flex gap-2">
+        <form onsubmit="handleManualSearch(event)" class="flex gap-2">
           <input type="number" pattern="[0-9]*" id="manualBarcodeScan" placeholder="Código de barras..." class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
-          <button onclick="processBarcode(document.getElementById('manualBarcodeScan').value.trim())" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-xs font-semibold text-slate-200 active:scale-95 transition">
+          <button type="submit" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-xs font-semibold text-slate-200 active:scale-95 transition">
             Buscar
           </button>
-        </div>
+        </form>
       </div>
 
+      <!-- Ficha de Producto (Se despliega automáticamente) -->
       <div id="productCard" class="hidden bg-slate-800 p-4 rounded-xl border border-amber-500/50 space-y-3">
         <div class="flex justify-between items-center">
           <span id="barcodeDisplay" class="text-xs font-mono bg-slate-900 px-2 py-1 rounded text-amber-400 border border-slate-700">0000000000000</span>
@@ -91,7 +90,7 @@
 
         <div>
           <label class="block text-xs text-slate-400 mb-1">Nombre del Producto</label>
-          <input type="text" id="prodName" placeholder="Ej. Jabón Zote 400g" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+          <input type="text" id="prodName" placeholder="Ej. Galletas Emperador 100g" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
         </div>
 
         <div class="grid grid-cols-2 gap-2">
@@ -106,32 +105,32 @@
         </div>
 
         <div class="grid grid-cols-2 gap-2 pt-1">
-          <button onclick="saveProduct()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-lg active:scale-95 transition text-xs">
-            Guardar Producto
+          <button type="button" onclick="saveProduct()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-lg active:scale-95 transition text-xs">
+            Guardar
           </button>
-          <button onclick="addCurrentToCart()" class="bg-emerald-600 hover:bg-emerald-500 text-slate-100 font-bold py-2.5 rounded-lg active:scale-95 transition text-xs">
-            + Agregar a Venta
+          <button type="button" onclick="addCurrentToCart()" class="bg-emerald-600 hover:bg-emerald-500 text-slate-100 font-bold py-2.5 rounded-lg active:scale-95 transition text-xs">
+            + A Venta
           </button>
         </div>
       </div>
     </section>
 
-    <!-- PESTAÑA 2: VENTA (POS) -->
+    <!-- SECCIÓN 2: VENTA (POS) -->
     <section id="sec-pos" class="hidden space-y-4">
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
-        <label class="block text-xs font-semibold text-slate-300">Agregar Código Manual a la Venta</label>
-        <div class="flex gap-2">
+        <label class="block text-xs font-semibold text-slate-300">Agregar Código Manual a Venta</label>
+        <form onsubmit="handlePOSManual(event)" class="flex gap-2">
           <input type="number" pattern="[0-9]*" id="manualBarcodePOS" placeholder="Código de barras..." class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
-          <button onclick="addManualToCart()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-xs font-bold text-slate-100 active:scale-95 transition">
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-xs font-bold text-slate-100 active:scale-95 transition">
             + Agregar
           </button>
-        </div>
+        </form>
       </div>
 
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
         <div class="flex justify-between items-center">
-          <h2 class="font-bold text-slate-200 text-sm">Ticket de Venta</h2>
-          <button onclick="clearCart()" class="text-[11px] text-rose-400 hover:underline">Vaciar Carrito</button>
+          <h2 class="font-bold text-slate-200 text-sm">Carrito Actual</h2>
+          <button type="button" onclick="clearCart()" class="text-[11px] text-rose-400 hover:underline">Vaciar</button>
         </div>
 
         <div id="cartList" class="space-y-2 text-xs divide-y divide-slate-700/50">
@@ -140,13 +139,13 @@
 
         <div class="border-t border-slate-700 pt-3 space-y-2">
           <div class="flex justify-between items-center">
-            <span class="text-sm font-semibold text-slate-300">Total a Cobrar:</span>
+            <span class="text-sm font-semibold text-slate-300">Total:</span>
             <span id="cartTotal" class="text-emerald-400 text-2xl font-black">$0.00</span>
           </div>
 
           <div class="grid grid-cols-2 gap-2 pt-2">
             <div>
-              <label class="block text-[10px] text-slate-400 mb-1">Paga con ($)</label>
+              <label class="block text-[10px] text-slate-400 mb-1">Pago ($)</label>
               <input type="number" id="payAmount" oninput="calculateChange()" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
             </div>
             <div>
@@ -155,14 +154,14 @@
             </div>
           </div>
 
-          <button onclick="completeSale()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl active:scale-95 transition text-xs uppercase tracking-wider mt-2">
-            ✓ Completar Venta
+          <button type="button" onclick="completeSale()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl active:scale-95 transition text-xs uppercase tracking-wider mt-2">
+            ✓ Cobrar Venta
           </button>
         </div>
       </div>
     </section>
 
-    <!-- PESTAÑA 3: STOCK -->
+    <!-- SECCIÓN 3: STOCK -->
     <section id="sec-inventory" class="hidden space-y-4">
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
         <h2 class="font-bold text-slate-200 text-sm">Inventario Registrado</h2>
@@ -170,12 +169,15 @@
       </div>
     </section>
 
-    <!-- PESTAÑA 4: DATOS -->
+    <!-- SECCIÓN 4: DATOS -->
     <section id="sec-data" class="hidden space-y-4">
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
-        <h2 class="font-bold text-slate-200 text-sm">Copias de Seguridad</h2>
-        <button onclick="exportJSON()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 p-2.5 rounded-lg text-xs font-semibold">
-          Exportar Inventario en JSON
+        <h2 class="font-bold text-slate-200 text-sm">Base de Datos</h2>
+        <button type="button" onclick="exportJSON()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 p-2.5 rounded-lg text-xs font-semibold">
+          Exportar copia de seguridad (JSON)
+        </button>
+        <button type="button" onclick="clearAllData()" class="w-full bg-rose-950/60 hover:bg-rose-900 text-rose-300 p-2.5 rounded-lg text-xs font-semibold border border-rose-800/50">
+          Borrar toda la base de datos
         </button>
       </div>
     </section>
@@ -183,20 +185,7 @@
   </main>
 
   <script>
-    // Manejador visual global de errores para depuración en móvil
-    window.onerror = function(msg, url, lineNo) {
-      let errDiv = document.getElementById('debug-log');
-      if (!errDiv) {
-        errDiv = document.createElement('div');
-        errDiv.id = 'debug-log';
-        errDiv.style = 'position:fixed;bottom:0;left:0;right:0;background:#881337;color:#fff;padding:8px;font-size:11px;z-index:9999;font-family:monospace;';
-        document.body.appendChild(errDiv);
-      }
-      errDiv.innerHTML = `⚠️ Error: ${msg} (Línea: ${lineNo})`;
-      return false;
-    };
-
-    const DB_KEY = 'reyes_magos_db';
+    const DB_KEY = 'reyes_magos_db_v2';
     let db = {};
     let cart = [];
     let html5QrCode = null;
@@ -205,30 +194,30 @@
     let currentTab = 'scan';
 
     document.addEventListener("DOMContentLoaded", () => {
-      try {
-        db = JSON.parse(localStorage.getItem(DB_KEY)) || {};
-      } catch(e) {
-        db = {};
-      }
-      repairDB();
+      initDB();
       updateBadge();
     });
 
-    function repairDB() {
-      let modified = false;
-      Object.keys(db).forEach(code => {
-        if (db[code].stock === undefined || db[code].stock === null || isNaN(db[code].stock)) {
-          db[code].stock = 0;
-          modified = true;
+    function initDB() {
+      try {
+        const raw = localStorage.getItem(DB_KEY);
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          db = parsed;
+        } else {
+          db = {};
         }
-      });
-      if (modified) saveDB();
+      } catch (e) {
+        db = {};
+      }
     }
 
     function saveDB() {
       try {
         localStorage.setItem(DB_KEY, JSON.stringify(db));
-      } catch(e) {}
+      } catch (e) {
+        alert("Atención: No se pudo escribir en el almacenamiento del navegador.");
+      }
       updateBadge();
     }
 
@@ -253,13 +242,13 @@
     }
 
     async function toggleCamera() {
-      if (typeof Html5Qrcode === 'undefined') {
-        alert("Cargando motor de cámara... Intenta de nuevo en 3 segundos.");
-        return;
-      }
-
       const btn = document.getElementById('toggleCamBtn');
       const placeholder = document.getElementById('scanner-placeholder');
+
+      if (typeof Html5Qrcode === 'undefined') {
+        alert("El motor de escaneo está cargando. Intenta de nuevo en un segundo.");
+        return;
+      }
 
       if (!html5QrCode) {
         html5QrCode = new Html5Qrcode("reader");
@@ -271,15 +260,26 @@
           isScanning = false;
           btn.innerText = "Encender Cámara";
           btn.className = "px-3.5 py-2 bg-amber-500 text-slate-950 text-xs font-bold rounded-lg active:scale-95 transition";
-          if (placeholder) placeholder.classList.remove('hidden');
-        } catch (err) {}
+          if (placeholder) placeholder.style.display = 'block';
+        } catch (err) {
+          console.error(err);
+        }
       } else {
         try {
-          if (placeholder) placeholder.classList.add('hidden');
+          const cameras = await Html5Qrcode.getCameras();
+          if (!cameras || cameras.length === 0) {
+            alert("No se detectó ninguna cámara en este dispositivo.");
+            return;
+          }
+
+          // Seleccionar la cámara trasera (normalmente la última en dispositivos Android)
+          let backCam = cameras.find(c => c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('trasera')) || cameras[cameras.length - 1];
+
+          if (placeholder) placeholder.style.display = 'none';
 
           await html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 250, height: 150 } },
+            backCam.id,
+            { fps: 10, qrbox: { width: 220, height: 140 } },
             onScanSuccess
           );
 
@@ -288,8 +288,8 @@
           btn.className = "px-3.5 py-2 bg-rose-500 text-slate-100 text-xs font-bold rounded-lg active:scale-95 transition";
 
         } catch (err) {
-          if (placeholder) placeholder.classList.remove('hidden');
-          alert("Error de permisos de cámara. Revisa la configuración de tu navegador.");
+          if (placeholder) placeholder.style.display = 'block';
+          alert("Permiso de cámara denegado o no disponible en HTTPS.");
         }
       }
     }
@@ -300,6 +300,25 @@
       processBarcode(decodedText);
     }
 
+    function handleManualSearch(e) {
+      if (e) e.preventDefault();
+      const input = document.getElementById('manualBarcodeScan');
+      if (!input) return;
+      const code = input.value.trim();
+      if (!code) return;
+      processBarcode(code);
+    }
+
+    function handlePOSManual(e) {
+      if (e) e.preventDefault();
+      const input = document.getElementById('manualBarcodePOS');
+      if (!input) return;
+      const code = input.value.trim();
+      if (!code) return;
+      addToCart(code);
+      input.value = '';
+    }
+
     function processBarcode(code) {
       if (!code) return;
 
@@ -308,13 +327,17 @@
       } else {
         currentBarcode = code;
         const pCard = document.getElementById('productCard');
-        if (pCard) pCard.classList.remove('hidden');
+        if (pCard) {
+          pCard.classList.remove('hidden');
+          pCard.style.display = 'block';
+          pCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
         
         document.getElementById('barcodeDisplay').innerText = code;
 
         if (db[code]) {
           document.getElementById('prodName').value = db[code].name || '';
-          document.getElementById('prodPrice').value = db[code].price || '';
+          document.getElementById('prodPrice').value = db[code].price !== undefined ? db[code].price : '';
           document.getElementById('prodStock').value = db[code].stock !== undefined ? db[code].stock : 0;
           document.getElementById('sourceTag').innerText = "REGISTRADO";
           document.getElementById('sourceTag').className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-900 text-emerald-300";
@@ -340,7 +363,7 @@
       saveDB();
       document.getElementById('sourceTag').innerText = "GUARDADO";
       document.getElementById('sourceTag').className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-900 text-emerald-300";
-      alert("Producto guardado correctamente");
+      alert(`Producto "${name}" guardado.`);
     }
 
     function addCurrentToCart() {
@@ -352,17 +375,9 @@
       switchTab('pos');
     }
 
-    function addManualToCart() {
-      const input = document.getElementById('manualBarcodePOS');
-      const code = input.value.trim();
-      if (!code) return;
-      addToCart(code);
-      input.value = '';
-    }
-
     function addToCart(code) {
       if (!db[code]) {
-        alert(`El código ${code} no existe en el inventario. Agrégalo primero en la pestaña Escáner.`);
+        alert(`El código ${code} no está registrado. Agrégalo primero en la pestaña Escáner.`);
         return;
       }
 
@@ -419,9 +434,9 @@
               <p class="text-emerald-400 font-mono text-[11px]">$${item.price.toFixed(2)} x ${item.qty} = $${itemTotal.toFixed(2)}</p>
             </div>
             <div class="flex items-center gap-2">
-              <button onclick="updateQty(${index}, -1)" class="w-6 h-6 bg-slate-700 text-slate-200 rounded font-bold hover:bg-slate-600">-</button>
+              <button type="button" onclick="updateQty(${index}, -1)" class="w-6 h-6 bg-slate-700 text-slate-200 rounded font-bold hover:bg-slate-600">-</button>
               <span class="font-mono text-xs w-4 text-center">${item.qty}</span>
-              <button onclick="updateQty(${index}, 1)" class="w-6 h-6 bg-slate-700 text-slate-200 rounded font-bold hover:bg-slate-600">+</button>
+              <button type="button" onclick="updateQty(${index}, 1)" class="w-6 h-6 bg-slate-700 text-slate-200 rounded font-bold hover:bg-slate-600">+</button>
             </div>
           </div>
         `;
@@ -459,24 +474,4 @@
       if (cart.length === 0) return alert("El carrito está vacío.");
       
       const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-      const payInput = document.getElementById('payAmount');
-      const pay = parseFloat(payInput ? payInput.value : 0) || 0;
-
-      if (pay < total) {
-        return alert("El monto pagado es menor al total de la venta.");
-      }
-
-      cart.forEach(item => {
-        if (db[item.code]) {
-          db[item.code].stock = Math.max(0, (db[item.code].stock || 0) - item.qty);
-        }
-      });
-
-      saveDB();
-      alert(`Venta completada con éxito.\nCambio: $${(pay - total).toFixed(2)}`);
-      clearCart();
-    }
-
-    function switchTab(tab) {
-      currentTab = tab;
-      [
+    
