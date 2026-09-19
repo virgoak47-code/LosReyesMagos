@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Abarrotes Reyes Magos - POS</title>
   
+  <!-- Tailwind CDN primero para evitar sobreescribir CSS base -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body {
@@ -28,8 +32,11 @@
       gap: 0.5rem;
     }
     .btn-primary { background-color: #f59e0b; color: #020617; }
+    .btn-primary:hover { background-color: #d97706; }
     .btn-success { background-color: #10b981; color: #020617; }
+    .btn-success:hover { background-color: #059669; }
     .btn-secondary { background-color: #334155; color: #f8fafc; }
+    .btn-secondary:hover { background-color: #475569; }
     .btn-danger { background-color: #9f1239; color: #fecdd3; }
     .card {
       background-color: #1e293b;
@@ -45,15 +52,12 @@
       max-height: 220px;
     }
   </style>
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 
-  <!-- Barra de Advertencia de Protocolo -->
+  <!-- Mensaje de aviso de protocolo -->
   <div id="protocolWarning" style="display:none;" class="bg-amber-500/10 border border-amber-500/40 p-3 mx-4 rounded-xl mb-4 text-xs text-amber-300">
-    ⚠️ <strong>Modo Local Detectado (`file://`):</strong> La cámara en vivo puede ser bloqueada por el navegador por falta de HTTPS. Usa el botón <strong>"📷 Tomar Foto a Código"</strong> como alternativa o ingresa los dígitos manualmente.
+    ⚠️ <strong>Modo Local Detectado (`file://`):</strong> La cámara requiere un servidor seguro (HTTPS). En GitHub Pages funcionará de forma nativa.
   </div>
 
   <!-- Header -->
@@ -62,7 +66,7 @@
       <span class="text-2xl">🏪</span>
       <div>
         <h1 class="font-bold text-base text-amber-400 leading-tight">Abarrotes Reyes Magos</h1>
-        <p class="text-[11px] text-slate-400">Punto de Venta <span class="text-emerald-400 font-bold">[v4.2]</span></p>
+        <p class="text-[11px] text-slate-400">Punto de Venta <span class="text-emerald-400 font-bold">[v4.3 Fix]</span></p>
       </div>
     </div>
     <button type="button" onclick="openInventoryModal()" id="statusBadge" class="btn btn-secondary text-xs">
@@ -84,11 +88,11 @@
       <div class="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950 min-h-[160px] flex items-center justify-center">
         <div id="reader" class="w-full min-h-[160px]"></div>
         <div id="scanner-placeholder" class="p-4 text-center text-xs text-slate-400 absolute">
-          📷 Cámara en vivo apagada.
+          📷 Cámara apagada.
         </div>
       </div>
 
-      <!-- Opción Fallback: Foto Nativa -->
+      <!-- Foto Nativa -->
       <div class="flex gap-2">
         <label class="btn btn-secondary flex-1 cursor-pointer text-center text-xs">
           📷 Capturar Foto de Código
@@ -127,7 +131,7 @@
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Efectivo ($)</label>
-            <input type="number" id="payAmount" oninput="calculateChange()" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-base text-slate-100 font-bold focus:outline-none focus:border-emerald-500">
+            <input type="number" step="any" id="payAmount" oninput="calculateChange()" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-base text-slate-100 font-bold focus:outline-none focus:border-emerald-500">
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1">Cambio ($)</label>
@@ -171,7 +175,7 @@
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block text-xs text-slate-400 mb-1">Precio Venta ($)</label>
-          <input type="number" step="0.5" id="newProdPrice" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-emerald-400 font-bold">
+          <input type="number" step="any" id="newProdPrice" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-emerald-400 font-bold">
         </div>
         <div>
           <label class="block text-xs text-slate-400 mb-1">Stock</label>
@@ -213,9 +217,10 @@
     let html5QrCode = null;
     let isScanning = false;
     let pendingBarcode = null;
+    let lastScannedCode = null;
+    let lastScanTime = 0;
 
     document.addEventListener("DOMContentLoaded", () => {
-      // Detección de protocolo seguro
       if (window.location.protocol === 'file:') {
         const warn = document.getElementById('protocolWarning');
         if (warn) warn.style.display = 'block';
@@ -223,14 +228,18 @@
 
       try {
         db = JSON.parse(localStorage.getItem(DB_KEY)) || {};
-      } catch(e) { db = {}; }
+      } catch(e) { 
+        db = {}; 
+      }
 
       updateBadge();
       renderCart();
     });
 
     function saveDB() {
-      try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
+      try { 
+        localStorage.setItem(DB_KEY, JSON.stringify(db)); 
+      } catch(e) {}
       updateBadge();
     }
 
@@ -255,6 +264,14 @@
     function processBarcode(code) {
       if (!code) return;
 
+      // Anti-bounce: evita doble lectura en menos de 1.5 segundos
+      const now = Date.now();
+      if (code === lastScannedCode && (now - lastScanTime) < 1500) {
+        return;
+      }
+      lastScannedCode = code;
+      lastScanTime = now;
+
       if (db[code]) {
         addToCart(code);
       } else {
@@ -264,33 +281,59 @@
         document.getElementById('newProdPrice').value = '';
         document.getElementById('newProdStock').value = '10';
         document.getElementById('newProductModal').classList.remove('hidden');
+        
+        setTimeout(() => {
+          document.getElementById('newProdName').focus();
+        }, 100);
       }
     }
 
-    function scanImageFile(input) {
+    async function stopCameraIfActive() {
+      if (isScanning && html5QrCode) {
+        try {
+          await html5QrCode.stop();
+          html5QrCode.clear();
+        } catch (err) {
+          console.warn("Error deteniendo escáner:", err);
+        }
+        isScanning = false;
+        const btn = document.getElementById('toggleCamBtn');
+        const placeholder = document.getElementById('scanner-placeholder');
+        if (btn) btn.innerText = "Encender Cámara";
+        if (placeholder) placeholder.style.display = 'block';
+      }
+    }
+
+    async function scanImageFile(input) {
       if (!input.files || input.files.length === 0) return;
       const file = input.files[0];
-      
+
+      // Si la cámara en vivo está encendida, la apagamos primero
+      await stopCameraIfActive();
+
       if (!html5QrCode) {
         html5QrCode = new Html5Qrcode("reader");
       }
 
-      html5QrCode.scanFile(file, true)
-        .then(decodedText => {
-          processBarcode(decodedText);
-        })
-        .catch(err => {
-          alert("No se pudo detectar un código claro en la imagen. Intenta acercar la foto.");
-        });
+      try {
+        const decodedText = await html5QrCode.scanFile(file, true);
+        processBarcode(decodedText);
+      } catch (err) {
+        alert("No se detectó un código claro en la imagen. Intenta con una toma más cercana y enfocada.");
+      } finally {
+        input.value = ''; // Reset input file
+      }
     }
 
     function saveAndAddProduct() {
       if (!pendingBarcode) return;
       const name = document.getElementById('newProdName').value.trim();
-      const price = parseFloat(document.getElementById('newProdPrice').value) || 0;
+      const price = parseFloat(document.getElementById('newProdPrice').value);
       const stock = parseInt(document.getElementById('newProdStock').value) || 0;
 
-      if (!name || price <= 0) return alert("Completa un nombre y precio válido.");
+      if (!name || isNaN(price) || price <= 0) {
+        return alert("Por favor ingresa un nombre y un precio válido mayor a 0.");
+      }
 
       db[pendingBarcode] = { name, price, stock };
       saveDB();
@@ -339,7 +382,7 @@
                 <p class="text-emerald-400 font-bold text-xs">$${item.price.toFixed(2)}</p>
                 <p class="text-[10px] text-slate-400">Stock: ${item.stock}</p>
               </div>
-              <button type="button" onclick="editProductPrompt('${code}')" class="bg-slate-700 p-1 rounded text-amber-400 text-xs">✏️</button>
+              <button type="button" onclick="editProductPrompt('${code}')" class="bg-slate-700 p-1.5 rounded text-amber-400 text-xs">✏️</button>
             </div>
           </div>
         `;
@@ -459,7 +502,9 @@
       if (pay < total) return alert(`Ingresa al menos $${total.toFixed(2)}.`);
 
       cart.forEach(item => {
-        if (db[item.code]) db[item.code].stock = Math.max(0, db[item.code].stock - item.qty);
+        if (db[item.code]) {
+          db[item.code].stock = Math.max(0, db[item.code].stock - item.qty);
+        }
       });
 
       saveDB();
@@ -471,38 +516,4 @@
       const btn = document.getElementById('toggleCamBtn');
       const placeholder = document.getElementById('scanner-placeholder');
 
-      if (typeof Html5Qrcode === 'undefined') {
-        return alert("Error al cargar la librería. Revisa la conexión a internet.");
-      }
-
-      if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-
-      if (isScanning) {
-        try {
-          await html5QrCode.stop();
-          isScanning = false;
-          btn.innerText = "Encender Cámara";
-          if (placeholder) placeholder.style.display = 'block';
-        } catch (err) {}
-      } else {
-        try {
-          if (placeholder) placeholder.style.display = 'none';
-
-          await html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 220, height: 130 } },
-            (decodedText) => processBarcode(decodedText),
-            () => {}
-          );
-
-          isScanning = true;
-          btn.innerText = "Apagar Cámara";
-        } catch (err) {
-          if (placeholder) placeholder.style.display = 'block';
-          alert("El navegador bloqueó la cámara en vivo. Usa el botón '📷 Capturar Foto de Código' abajo.");
-        }
-      }
-    }
-  </script>
-</body>
-</html>
+      if (typeof Html5Qr
