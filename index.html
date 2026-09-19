@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Abarrotes Reyes Magos - POS Pro</title>
   
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" onerror="window.camLibFailed=true"></script>
 
   <style>
     :root {
@@ -41,8 +41,8 @@
     .input:focus { border-color: var(--amber); }
     
     .scanner-container { background: #020617; border-radius: 8px; padding: 8px; text-align: center; margin-bottom: 10px; border: 1px solid var(--border); }
-    #reader { width: 100%; min-height: 100px; border-radius: 6px; overflow: hidden; }
-    #reader video { width: 100% !important; max-height: 180px; object-fit: cover; }
+    #reader { width: 100%; min-height: 120px; border-radius: 6px; overflow: hidden; }
+    #reader video { width: 100% !important; max-height: 200px; object-fit: cover; }
     
     .flex-gap { display: flex; gap: 8px; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -64,7 +64,7 @@
   <div class="header">
     <div>
       <div class="title">🏪 Abarrotes Reyes Magos</div>
-      <div class="version">Punto de Venta [v6.1 Pro]</div>
+      <div class="version">Punto de Venta [v6.2 Pro]</div>
     </div>
     <div class="flex-gap">
       <button class="btn btn-sky btn-xs" onclick="openCutModal()">📊 Corte</button>
@@ -86,7 +86,7 @@
 
     <div class="flex-gap" style="margin-bottom: 10px;">
       <label class="btn btn-slate" style="font-size: 11px; cursor: pointer;">
-        📷 Subir / Capturar Foto de Código
+        📷 Capturar Foto de Código
         <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="scanImage(this)">
       </label>
     </div>
@@ -160,7 +160,7 @@
         <button onclick="closeModal('catModal')" style="background:none; border:none; color:#fff; font-weight:bold; cursor:pointer;">✕</button>
       </div>
       <input type="text" id="catSearch" class="input" placeholder="🔍 Buscar por nombre o código..." oninput="renderCat()">
-      <div id="catList" style="flex:1; overflow-y:auto; max-height: 320px;"></div>
+      <div id="catList" style="flex:1; overflow-y:auto; max-height: 300px;"></div>
       <button class="btn btn-slate" onclick="closeModal('catModal')">Cerrar</button>
     </div>
   </div>
@@ -183,15 +183,15 @@
   </div>
 
   <script>
-    const DB_KEY = 'reyes_magos_v61_db';
-    const SALES_KEY = 'reyes_magos_v61_sales';
-    
-    let db = {}, sales = [], cart = [], html5QrCode = null, isScanning = false, editingCode = null;
-
     function setStatus(msg) {
       const el = document.getElementById('camStatus');
       if (el) el.innerText = msg;
     }
+
+    const DB_KEY = 'reyes_magos_v62_db';
+    const SALES_KEY = 'reyes_magos_v62_sales';
+    
+    let db = {}, sales = [], cart = [], scanner = null, isScanning = false, editingCode = null;
 
     window.onload = function() {
       try {
@@ -223,7 +223,7 @@
         const currentInCart = idx > -1 ? cart[idx].qty : 0;
 
         if (currentInCart + 1 > prod.stock) {
-          alert(`⚠️ Stock insuficiente. Solo quedan ${prod.stock} unidades de${prod.name}.`);
+          alert(`⚠️ Stock insuficiente. Solo quedan ${prod.stock} unidades de ${prod.name}.`);
           return;
         }
 
@@ -256,10 +256,10 @@
     function saveProd() {
       const name = document.getElementById('newProdName').value.trim();
       const price = parseFloat(document.getElementById('newProdPrice').value);
-      const stock = parseInt(document.getElementById('newProdStock').value);
+      const stock = parseInt(document.getElementById('newProdStock').value) || 0;
 
-      if (!name || isNaN(price) || price <= 0 || isNaN(stock)) {
-        return alert("Ingresa un nombre, precio válido y stock.");
+      if (!name || isNaN(price) || price <= 0) {
+        return alert("Ingresa un nombre y precio válido.");
       }
 
       const isNew = !db[editingCode];
@@ -300,7 +300,8 @@
         container.innerHTML += `
           <div class="cart-item">
             <div>
-              <div style="font-size:12px; font-weight:bold;">${item.name}</div>               <div style="font-size:10px; color:var(--emerald);">$${item.price.toFixed(2)} x ${item.qty} =$${sub.toFixed(2)}</div>
+              <div style="font-size:12px; font-weight:bold;">${item.name}</div>
+              <div style="font-size:10px; color:var(--emerald);">$${item.price.toFixed(2)} x ${item.qty} = $${sub.toFixed(2)}</div>
             </div>
             <div style="display:flex; gap:6px; align-items:center;">
               <button class="cart-qty-btn" onclick="modQty(${index}, -1)">-</button>
@@ -360,6 +361,7 @@
       if (cart.length === 0) return alert("Agrega productos primero.");
       if (pay < total) return alert(`Ingresa un pago mayor o igual a $${total.toFixed(2)}`);
 
+      // Descontar stock
       cart.forEach(item => {
         if (db[item.code]) {
           db[item.code].stock -= item.qty;
@@ -368,23 +370,30 @@
       });
       localStorage.setItem(DB_KEY, JSON.stringify(db));
 
+      // Guardar venta para el corte
       sales.push({ date: new Date().toISOString(), total, items: [...cart] });
       localStorage.setItem(SALES_KEY, JSON.stringify(sales));
 
-      alert(`✅ Venta realizada\nTotal: $${total.toFixed(2)}\nCambio:$${(pay - total).toFixed(2)}`);
+      alert(`✅ Venta realizada\nTotal: $${total.toFixed(2)}\nCambio: $${(pay - total).toFixed(2)}`);
       clearCart();
       document.getElementById('payInput').value = '';
     }
 
     async function toggleCam() {
+      if (window.camLibFailed || typeof Html5Qrcode === 'undefined') {
+        return alert("No se pudo cargar la librería de cámara.");
+      }
+
       const btn = document.getElementById('camToggleBtn');
 
       if (isScanning) {
-        if (html5QrCode) {
+        setStatus("⏳ Cerrando cámara...");
+        if (scanner) {
           try {
-            await html5QrCode.stop();
-            await html5QrCode.clear();
+            await scanner.stop();
+            await scanner.clear();
           } catch(e) {}
+          scanner = null;
         }
         isScanning = false;
         if (btn) {
@@ -396,22 +405,14 @@
       }
 
       try {
-        setStatus("⏳ Iniciando permisos...");
-        if (!html5QrCode) {
-          html5QrCode = new Html5Qrcode("reader");
-        }
+        if (!scanner) scanner = new Html5Qrcode("reader");
+        setStatus("⏳ Encendiendo...");
         
-        const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-          processCode(decodedText);
-        };
-        
-        const config = { fps: 10, qrbox: { width: 200, height: 100 } };
-
-        await html5QrCode.start(
-          { facingMode: "environment" }, 
-          config, 
-          qrCodeSuccessCallback,
-          (errorMessage) => {}
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 220, height: 120 } },
+          (text) => { processCode(text); },
+          () => {}
         );
 
         isScanning = true;
@@ -420,27 +421,23 @@
           btn.className = "btn btn-rose btn-xs";
         }
         setStatus("🟢 Cámara Activa");
-      } catch (err) {
-        console.error(err);
-        setStatus("❌ Error de cámara");
-        alert("No se pudo iniciar la cámara. Verifica los permisos de tu navegador o que la página use HTTPS.");
+      } catch(e) {
+        setStatus("❌ Error al abrir cámara");
+        alert("La cámara no se pudo activar. Asegúrate de dar permisos de cámara o recargar.");
       }
     }
 
     async function scanImage(input) {
       if (!input.files || !input.files[0]) return;
+      if (typeof Html5Qrcode === 'undefined') return alert("Librería no lista.");
+      
       try {
-        if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-        setStatus("⏳ Leyendo imagen...");
-        const decodedText = await html5QrCode.scanFile(input.files[0], true);
-        processCode(decodedText);
-        setStatus("📷 Imagen leída con éxito");
-      } catch (err) {
-        setStatus("❌ Sin código detectado");
-        alert("No se pudo leer un código de barras en la foto seleccionada.");
-      } finally {
-        input.value = '';
-      }
+        if (!scanner) scanner = new Html5Qrcode("reader");
+        const res = await scanner.scanFile(input.files[0], true);
+        processCode(res);
+      } catch(e) {
+        alert("No se detectó código de barras en la foto.");
+      } finally { input.value = ''; }
     }
 
     function openInventory() {
@@ -463,7 +460,7 @@
       keys.forEach(code => {
         const item = db[code];
         if (q && !item.name.toLowerCase().includes(q) && !code.includes(q)) return;
-        
+
         const isLow = item.stock <= 3;
         const badgeClass = isLow ? 'stock-low' : 'stock-ok';
 
@@ -472,4 +469,7 @@
             <div style="flex:1; cursor:pointer;" onclick="selectFromCat('${code}')">
               <div style="font-size:12px; font-weight:bold;">${item.name}</div>
               <div style="font-size:10px; color:var(--text-muted); font-family:monospace;">${code}</div>
-              <span class="badge-stock ${badgeClass}">Stock: ${item.stock}</span>       
+              <span class="badge-stock ${badgeClass}">Stock: ${item.stock}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+        
