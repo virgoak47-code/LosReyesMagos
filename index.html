@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Abarrotes Reyes Magos - POS</title>
   
-  <!-- Carga de cámara con fallback silencioso -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" onerror="window.camLibFailed=true"></script>
 
   <style>
@@ -38,7 +37,8 @@
     .input { width: 100%; background: #020617; border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: #fff; font-size: 14px; outline: none; }
     .input:focus { border-color: var(--amber); }
     
-    #reader { width: 100%; min-height: 150px; background: #020617; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .scanner-container { background: #020617; border-radius: 8px; padding: 8px; text-align: center; margin-bottom: 10px; border: 1px solid var(--border); }
+    #reader { width: 100%; min-height: 120px; border-radius: 6px; overflow: hidden; }
     #reader video { width: 100% !important; max-height: 200px; object-fit: cover; }
     
     .flex-gap { display: flex; gap: 8px; }
@@ -57,7 +57,7 @@
   <div class="header">
     <div>
       <div class="title">🏪 Abarrotes Reyes Magos</div>
-      <div class="version">Punto de Venta [v5.1 Standalone]</div>
+      <div class="version">Punto de Venta [v5.4 Clean UI]</div>
     </div>
     <button class="btn btn-slate" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openInventory()">
       📋 Catálogo (<span id="catCount">0</span>)
@@ -73,8 +73,9 @@
       </button>
     </div>
 
-    <div id="reader" style="margin-bottom: 10px;">
-      <span id="camStatus" style="font-size: 12px; color: var(--text-muted);">📷 Cámara Apagada</span>
+    <div class="scanner-container">
+      <div id="camStatus" style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">📷 Cámara Apagada</div>
+      <div id="reader"></div>
     </div>
 
     <div class="flex-gap" style="margin-bottom: 10px;">
@@ -122,18 +123,10 @@
     <button class="btn btn-emerald" style="padding: 12px;" onclick="checkout()">✓ FINALIZAR Y COBRAR</button>
   </div>
 
-  <!-- CONSOLA DE DIAGNÓSTICO -->
-  <div class="card" style="border-color: #475569;">
-    <div class="card-title">🐞 Registro de Diagnóstico</div>
-    <div id="debugLog" style="font-family: monospace; font-size: 10px; color: #f87171; max-height: 80px; overflow-y: auto; word-break: break-all;">
-      Sistema listo.
-    </div>
-  </div>
-
   <!-- MODAL NUEVO PRODUCTO -->
   <div id="newProdModal" class="modal hidden">
     <div class="modal-content">
-      <div style="display:flex; justify-between; align-items:center;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
         <strong style="color: var(--amber); font-size: 14px;">📦 Producto No Registrado</strong>
         <button onclick="closeModal('newProdModal')" style="background:none; border:none; color:#fff; font-weight:bold;">✕</button>
       </div>
@@ -161,40 +154,37 @@
   </div>
 
   <script>
-    // Registro de errores en pantalla
-    function log(msg) {
-      const box = document.getElementById('debugLog');
-      box.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}<br>` + box.innerHTML;
+    function setStatus(msg) {
+      const el = document.getElementById('camStatus');
+      if (el) el.innerText = msg;
     }
-    window.onerror = function(m, u, l) { log(`Error: ${m} (línea ${l})`); };
 
     const DB_KEY = 'reyes_magos_v51';
     let db = {}, cart = [], scanner = null, isScanning = false, pendingCode = null;
 
-    // Inicialización
     window.onload = function() {
       try {
         db = JSON.parse(localStorage.getItem(DB_KEY)) || {};
       } catch(e) { db = {}; }
       updateCatCount();
       renderCart();
-      log("Aplicación iniciada correctamente.");
     };
 
     function updateCatCount() {
-      document.getElementById('catCount').innerText = Object.keys(db).length;
+      const el = document.getElementById('catCount');
+      if (el) el.innerText = Object.keys(db).length;
     }
 
     function addManual() {
       const input = document.getElementById('manualCode');
+      if (!input) return;
       const code = input.value.trim();
-      if (!code) return log("Ingresa un código en el recuadro.");
+      if (!code) return;
       processCode(code);
       input.value = '';
     }
 
     function processCode(code) {
-      log(`Procesando código: ${code}`);
       if (db[code]) {
         const idx = cart.findIndex(i => i.code === code);
         if (idx > -1) cart[idx].qty++;
@@ -202,7 +192,8 @@
         renderCart();
       } else {
         pendingCode = code;
-        document.getElementById('modalCode').innerText = code;
+        const mc = document.getElementById('modalCode');
+        if (mc) mc.innerText = code;
         document.getElementById('newProdName').value = '';
         document.getElementById('newProdPrice').value = '';
         document.getElementById('newProdModal').classList.remove('hidden');
@@ -225,6 +216,7 @@
 
     function renderCart() {
       const container = document.getElementById('cartList');
+      if (!container) return;
       container.innerHTML = '';
       let total = 0;
 
@@ -270,6 +262,8 @@
       const pay = parseFloat(document.getElementById('payInput').value) || 0;
       const el = document.getElementById('changeText');
 
+      if (!el) return;
+
       if (total === 0) {
         el.innerText = '$0.00';
         el.style.color = 'var(--text-muted)';
@@ -300,23 +294,32 @@
 
     async function toggleCam() {
       if (window.camLibFailed || typeof Html5Qrcode === 'undefined') {
-        log("Librería de cámara no cargada por falta de red. Usa entrada manual o foto.");
-        return alert("No hay red para cargar la cámara en vivo. Usa 'Capturar Foto' o 'Escribir código'.");
+        return alert("No se pudo cargar la librería de cámara.");
       }
 
       const btn = document.getElementById('camToggleBtn');
+
       if (isScanning) {
-        if (scanner) await scanner.stop();
+        setStatus("⏳ Cerrando cámara...");
+        if (scanner) {
+          try {
+            await scanner.stop();
+            await scanner.clear();
+          } catch(e) {}
+          scanner = null;
+        }
         isScanning = false;
-        btn.innerText = "Encender Cámara";
-        btn.className = "btn btn-amber";
-        document.getElementById('camStatus').innerText = "📷 Cámara Apagada";
+        if (btn) {
+          btn.innerText = "Encender Cámara";
+          btn.className = "btn btn-amber";
+        }
+        setStatus("📷 Cámara Apagada");
         return;
       }
 
       try {
         if (!scanner) scanner = new Html5Qrcode("reader");
-        document.getElementById('camStatus').innerText = "⏳ Encendiendo...";
+        setStatus("⏳ Encendiendo...");
         
         await scanner.start(
           { facingMode: "environment" },
@@ -326,26 +329,27 @@
         );
 
         isScanning = true;
-        btn.innerText = "Apagar";
-        btn.className = "btn btn-rose";
+        if (btn) {
+          btn.innerText = "Apagar";
+          btn.className = "btn btn-rose";
+        }
+        setStatus("🟢 Cámara Activa");
       } catch(e) {
-        log(`Error Cámara: ${e}`);
-        alert("Permiso de cámara denegado o no disponible en el navegador.");
+        setStatus("❌ Error al abrir cámara");
+        alert("La cámara no se pudo activar. Intenta recargar la página.");
       }
     }
 
     async function scanImage(input) {
       if (!input.files || !input.files[0]) return;
-      if (typeof Html5Qrcode === 'undefined') return alert("Librería de escáner no disponible.");
+      if (typeof Html5Qrcode === 'undefined') return alert("Librería no lista.");
       
       try {
-        log("Analizando imagen...");
         if (!scanner) scanner = new Html5Qrcode("reader");
         const res = await scanner.scanFile(input.files[0], true);
         processCode(res);
       } catch(e) {
-        log("No se encontró código en la imagen.");
-        alert("No se detectó ningún código de barras en la foto.");
+        alert("No se detectó código de barras en la foto.");
       } finally { input.value = ''; }
     }
 
@@ -357,13 +361,14 @@
     function renderCat() {
       const q = (document.getElementById('catSearch').value || '').toLowerCase();
       const list = document.getElementById('catList');
+      if (!list) return;
       list.innerHTML = '';
       
       Object.keys(db).forEach(code => {
         const item = db[code];
         if (q && !item.name.toLowerCase().includes(q) && !code.includes(q)) return;
         list.innerHTML += `
-          <div style="display:flex; justify-between; align-items:center; padding: 8px 0; border-bottom:1px solid #334155;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom:1px solid #334155;">
             <div>
               <div style="font-size:12px; font-weight:bold;">${item.name}</div>
               <div style="font-size:10px; color:var(--text-muted); font-family:monospace;">${code}</div>
