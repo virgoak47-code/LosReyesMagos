@@ -33,7 +33,7 @@
 
   <main class="max-w-xl mx-auto px-4 py-4 space-y-4">
 
-    <!-- Pestañas -->
+    <!-- Navegación -->
     <nav class="grid grid-cols-4 bg-slate-800 p-1 rounded-xl border border-slate-700 text-xs font-medium gap-1">
       <button onclick="switchTab('scan')" id="tab-scan" class="py-2.5 text-center rounded-lg bg-amber-500 text-slate-950 font-bold">Escáner</button>
       <button onclick="switchTab('pos')" id="tab-pos" class="py-2.5 text-center rounded-lg hover:bg-slate-700 text-slate-300">Venta</button>
@@ -97,14 +97,38 @@
       </div>
     </section>
 
-    <!-- SECCIÓN VENTA -->
+    <!-- SECCIÓN VENTA (POS) -->
     <section id="sec-pos" class="hidden space-y-4">
       <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
-        <h2 class="font-bold text-slate-200 text-sm">Ticket de Venta</h2>
-        <div id="cartList" class="space-y-2 text-xs text-slate-400">Sin productos.</div>
-        <div class="border-t border-slate-700 pt-3 flex justify-between items-center">
-          <span class="text-sm font-semibold">Total:</span>
-          <span id="cartTotal" class="text-emerald-400 text-2xl font-black">$0.00</span>
+        <div class="flex justify-between items-center">
+          <h2 class="font-bold text-slate-200 text-sm">Ticket de Venta</h2>
+          <button onclick="clearCart()" class="text-[11px] text-rose-400 hover:underline">Vaciar Carrito</button>
+        </div>
+
+        <div id="cartList" class="space-y-2 text-xs divide-y divide-slate-700/50">
+          <p class="text-slate-500 text-center py-4">Escanea o busca un producto para agregar a la venta.</p>
+        </div>
+
+        <div class="border-t border-slate-700 pt-3 space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-sm font-semibold text-slate-300">Total a Cobrar:</span>
+            <span id="cartTotal" class="text-emerald-400 text-2xl font-black">$0.00</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-2">
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">Paga con ($)</label>
+              <input type="number" id="payAmount" oninput="calculateChange()" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">Cambio ($)</label>
+              <div id="changeAmount" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm font-bold text-amber-400 flex items-center">$0.00</div>
+            </div>
+          </div>
+
+          <button onclick="completeSale()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl active:scale-95 transition text-xs uppercase tracking-wider mt-2">
+            ✓ Completar Venta
+          </button>
         </div>
       </div>
     </section>
@@ -132,9 +156,11 @@
   <script>
     const DB_KEY = 'reyes_magos_db';
     let db = JSON.parse(localStorage.getItem(DB_KEY)) || {};
+    let cart = [];
     let html5QrCode = null;
     let isScanning = false;
     let currentBarcode = null;
+    let currentTab = 'scan';
 
     document.addEventListener("DOMContentLoaded", () => {
       repairDB();
@@ -161,7 +187,23 @@
       document.getElementById('statusBadge').innerText = `${Object.keys(db).length} Prod.`;
     }
 
-    // LÓGICA DE CÁMARA DETECTANDO LENTES FÍSICOS
+    // Sonido Beep Sintetizado
+    function playBeep() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.value = 1800;
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.08);
+      } catch (e) {}
+    }
+
+    // Cámara con filtro de sensores físicos
     async function toggleCamera() {
       if (typeof Html5Qrcode === 'undefined') {
         alert("Cargando librería... Espera unos segundos e intenta de nuevo.");
@@ -185,27 +227,20 @@
         } catch (err) {}
       } else {
         try {
-          // 1. Obtener la lista de cámaras físicas detectadas por Android
           const devices = await Html5Qrcode.getCameras();
           if (!devices || devices.length === 0) {
-            alert("No se encontró ninguna cámara en el dispositivo.");
+            alert("No se encontró ninguna cámara.");
             return;
           }
 
-          // 2. Buscar la cámara trasera principal por su nombre o tomar la última de la lista
           let backCam = devices.find(d => 
             d.label.toLowerCase().includes('back') || 
             d.label.toLowerCase().includes('rear') || 
             d.label.toLowerCase().includes('trasera')
-          );
-
-          if (!backCam) {
-            backCam = devices[devices.length - 1]; // La última suele ser la trasera en Android
-          }
+          ) || devices[devices.length - 1];
 
           placeholder.classList.add('hidden');
 
-          // 3. Encender pasando el ID exacto de la cámara
           await html5QrCode.start(
             backCam.id,
             { fps: 12, qrbox: { width: 240, height: 130 } },
@@ -218,34 +253,40 @@
 
         } catch (err) {
           placeholder.classList.remove('hidden');
-          alert("Error de acceso a la cámara: " + (err.message || err) + "\n\nAsegúrate de otorgar permisos en Chrome.");
+          alert("Error de acceso a la cámara. Revisa permisos en Chrome.");
         }
       }
     }
 
     function onScanSuccess(decodedText) {
       if (navigator.vibrate) navigator.vibrate(60);
+      playBeep();
       processBarcode(decodedText);
     }
 
     function processBarcode(code) {
       if (!code) return;
-      currentBarcode = code;
-      document.getElementById('productCard').classList.remove('hidden');
-      document.getElementById('barcodeDisplay').innerText = code;
 
-      if (db[code]) {
-        document.getElementById('prodName').value = db[code].name || '';
-        document.getElementById('prodPrice').value = db[code].price || '';
-        document.getElementById('prodStock').value = db[code].stock !== undefined ? db[code].stock : 0;
-        document.getElementById('sourceTag').innerText = "REGISTRADO";
-        document.getElementById('sourceTag').className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-900 text-emerald-300";
+      if (currentTab === 'pos') {
+        addToCart(code);
       } else {
-        document.getElementById('prodName').value = '';
-        document.getElementById('prodPrice').value = '';
-        document.getElementById('prodStock').value = '10';
-        document.getElementById('sourceTag').innerText = "NUEVO";
-        document.getElementById('sourceTag').className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-900 text-amber-300";
+        currentBarcode = code;
+        document.getElementById('productCard').classList.remove('hidden');
+        document.getElementById('barcodeDisplay').innerText = code;
+
+        if (db[code]) {
+          document.getElementById('prodName').value = db[code].name || '';
+          document.getElementById('prodPrice').value = db[code].price || '';
+          document.getElementById('prodStock').value = db[code].stock !== undefined ? db[code].stock : 0;
+          document.getElementById('sourceTag').innerText = "REGISTRADO";
+          document.getElementById('sourceTag').className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-900 text-emerald-300";
+        } else {
+          document.getElementById('prodName').value = '';
+          document.getElementById('prodPrice').value = '';
+          document.getElementById('prodStock').value = '10';
+          document.getElementById('sourceTag').innerText = "NUEVO";
+          document.getElementById('sourceTag').className = "text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-900 text-amber-300";
+        }
       }
     }
 
@@ -264,7 +305,118 @@
       alert("Producto guardado correctamente");
     }
 
+    // LÓGICA DE CARRITO Y POS
+    function addToCart(code) {
+      if (!db[code]) {
+        alert(`El código ${code} no está registrado. Agrégalo primero en la pestaña Escáner.`);
+        return;
+      }
+
+      const existingIndex = cart.findIndex(item => item.code === code);
+      if (existingIndex > -1) {
+        cart[existingIndex].qty += 1;
+      } else {
+        cart.push({
+          code: code,
+          name: db[code].name,
+          price: db[code].price,
+          qty: 1
+        });
+      }
+      renderCart();
+    }
+
+    function updateQty(index, delta) {
+      cart[index].qty += delta;
+      if (cart[index].qty <= 0) {
+        cart.splice(index, 1);
+      }
+      renderCart();
+    }
+
+    function clearCart() {
+      cart = [];
+      document.getElementById('payAmount').value = '';
+      renderCart();
+    }
+
+    function renderCart() {
+      const container = document.getElementById('cartList');
+      container.innerHTML = '';
+      let total = 0;
+
+      if (cart.length === 0) {
+        container.innerHTML = `<p class="text-slate-500 text-center py-4">Sin productos en el carrito.</p>`;
+        document.getElementById('cartTotal').innerText = '$0.00';
+        calculateChange();
+        return;
+      }
+
+      cart.forEach((item, index) => {
+        const itemTotal = item.price * item.qty;
+        total += itemTotal;
+
+        container.innerHTML += `
+          <div class="flex justify-between items-center pt-2">
+            <div>
+              <p class="font-bold text-slate-200 text-xs">${item.name}</p>
+              <p class="text-emerald-400 font-mono text-[11px]">$${item.price.toFixed(2)} x ${item.qty} = $${itemTotal.toFixed(2)}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="updateQty(${index}, -1)" class="w-6 h-6 bg-slate-700 text-slate-200 rounded font-bold hover:bg-slate-600">-</button>
+              <span class="font-mono text-xs w-4 text-center">${item.qty}</span>
+              <button onclick="updateQty(${index}, 1)" class="w-6 h-6 bg-slate-700 text-slate-200 rounded font-bold hover:bg-slate-600">+</button>
+            </div>
+          </div>
+        `;
+      });
+
+      document.getElementById('cartTotal').innerText = `$${total.toFixed(2)}`;
+      calculateChange();
+    }
+
+    function calculateChange() {
+      const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      const pay = parseFloat(document.getElementById('payAmount').value) || 0;
+      const change = pay - total;
+
+      const changeDisplay = document.getElementById('changeAmount');
+      if (pay > 0 && change >= 0) {
+        changeDisplay.innerText = `$${change.toFixed(2)}`;
+        changeDisplay.className = "w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm font-bold text-emerald-400 flex items-center";
+      } else if (pay > 0 && change < 0) {
+        changeDisplay.innerText = "Falta dinero";
+        changeDisplay.className = "w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-bold text-rose-400 flex items-center";
+      } else {
+        changeDisplay.innerText = "$0.00";
+        changeDisplay.className = "w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm font-bold text-amber-400 flex items-center";
+      }
+    }
+
+    function completeSale() {
+      if (cart.length === 0) return alert("El carrito está vacío.");
+      
+      const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      const pay = parseFloat(document.getElementById('payAmount').value) || 0;
+
+      if (pay < total) {
+        return alert("El monto pagado es menor al total de la venta.");
+      }
+
+      // Descontar inventario
+      cart.forEach(item => {
+        if (db[item.code]) {
+          db[item.code].stock = Math.max(0, (db[item.code].stock || 0) - item.qty);
+        }
+      });
+
+      saveDB();
+      alert(`Venta completada con éxito.\nCambio: $${(pay - total).toFixed(2)}`);
+      clearCart();
+    }
+
     function switchTab(tab) {
+      currentTab = tab;
       ['scan', 'pos', 'inventory', 'data'].forEach(t => {
         document.getElementById(`sec-${t}`).classList.add('hidden');
         document.getElementById(`tab-${t}`).className = "py-2.5 text-center rounded-lg hover:bg-slate-700 text-slate-300";
@@ -273,6 +425,7 @@
       document.getElementById(`tab-${tab}`).className = "py-2.5 text-center rounded-lg bg-amber-500 text-slate-950 font-bold";
 
       if (tab === 'inventory') renderInventory();
+      if (tab === 'pos') renderCart();
     }
 
     function renderInventory() {
@@ -287,6 +440,8 @@
 
       keys.reverse().forEach(code => {
         const item = db[code];
+        const lowStock = (item.stock || 0) <= 3;
+        
         container.innerHTML += `
           <div class="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-800">
             <div>
@@ -295,7 +450,7 @@
             </div>
             <div class="text-right">
               <p class="text-emerald-400 font-bold text-xs">$${(item.price || 0).toFixed(2)}</p>
-              <p class="text-slate-400 text-[10px]">Stock: <span class="font-bold text-slate-200">${item.stock || 0}</span></p>
+              <p class="text-slate-400 text-[10px]">Stock: <span class="font-bold ${lowStock ? 'text-rose-400' : 'text-slate-200'}">${item.stock || 0}</span></p>
             </div>
           </div>
         `;
