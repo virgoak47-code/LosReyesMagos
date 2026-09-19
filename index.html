@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Abarrotes Reyes Magos - Control de Precios</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen p-4 max-w-md mx-auto pb-24">
+
+  <!-- Header Tienda -->
+  <header class="text-center py-3 border-b border-zinc-800 space-y-1">
+    <h1 class="font-black text-xl tracking-wider text-amber-400 uppercase">Abarrotes Reyes Magos</h1>
+    <p class="text-[10px] text-zinc-400 font-semibold uppercase tracking-widest">Verificador y Gestor de Precios</p>
+  </header>
+
+  <main class="space-y-4 mt-4">
+
+    <!-- Visor de la Cámara -->
+    <div class="relative overflow-hidden rounded-2xl border-2 border-zinc-800 bg-zinc-900 shadow-xl">
+      <div id="reader" class="w-full"></div>
+      <div id="scanner-placeholder" class="p-8 text-center text-xs text-zinc-500">
+        Cámara apagada. Presiona "Iniciar Escáner" para leer un producto.
+      </div>
+    </div>
+
+    <button onclick="toggleCamera()" id="btn-cam" class="w-full bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg shadow-amber-950/50">
+      Iniciar Escáner
+    </button>
+
+    <!-- TARJETA / FORMULARIO DEL PRODUCTO -->
+    <div id="product-card" class="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+      <div class="flex justify-between items-center border-b border-zinc-800 pb-2">
+        <span class="text-[10px] font-mono text-amber-400/80 font-bold" id="disp-barcode">CÓDIGO: ---</span>
+        <span class="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-semibold" id="disp-status">Esperando lectura</span>
+      </div>
+
+      <div class="space-y-2">
+        <div>
+          <label class="text-[10px] uppercase font-bold text-zinc-400 block mb-1">Nombre del Producto</label>
+          <input type="text" id="input-name" placeholder="Ej. Coca-Cola 600ml PET" class="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-2.5 text-xs text-zinc-100 outline-none focus:border-amber-500">
+        </div>
+
+        <div>
+          <label class="text-[10px] uppercase font-bold text-zinc-400 block mb-1">Precio de Venta ($ MXN)</label>
+          <input type="number" step="0.5" id="input-price" placeholder="0.00" class="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-2.5 text-base font-bold text-amber-300 outline-none focus:border-amber-500">
+        </div>
+      </div>
+
+      <button onclick="saveProduct()" id="btn-save" class="w-full bg-zinc-800 text-zinc-300 font-bold py-2.5 rounded-xl text-xs active:scale-95 transition border border-zinc-700">
+        Guardar / Actualizar Precio
+      </button>
+    </div>
+
+    <!-- BUSCADOR / LISTA RÁPIDA DE INVENTARIO -->
+    <section class="space-y-2 pt-2">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-zinc-400">Inventario Registrado (<span id="total-items">0</span>)</h2>
+        <button onclick="exportData()" class="text-[10px] text-amber-400 font-semibold underline">Exportar Copia</button>
+      </div>
+
+      <input type="text" id="search-inventory" onkeyup="renderInventory()" placeholder="🔍 Buscar en tu inventario..." class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 outline-none focus:border-amber-500">
+
+      <div id="inventory-list" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
+    </section>
+
+  </main>
+
+  <script>
+    let html5QrCode;
+    let isScanning = false;
+    let currentBarcode = "";
+
+    // Carga de inventario local
+    function getInventory() {
+      return JSON.parse(localStorage.getItem('reyes_magos_db')) || {};
+    }
+
+    function setInventory(db) {
+      localStorage.setItem('reyes_magos_db', JSON.stringify(db));
+      renderInventory();
+    }
+
+    // Tono de lectura
+    function playBeep() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = 1000;
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.12);
+      } catch(e){}
+    }
+
+    // Consulta a la API pública si no existe localmente
+    async function fetchExternalProductName(barcode) {
+      document.getElementById('disp-status').innerText = "Buscando en red pública...";
+      document.getElementById('disp-status').className = "text-[10px] px-2 py-0.5 rounded-full bg-blue-900/50 text-blue-300 font-semibold";
+
+      try {
+        const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`);
+        const data = await response.json();
+
+        if (data.status === 1 && data.product && data.product.product_name) {
+          return data.product.product_name;
+        }
+      } catch (err) {
+        console.log("Error al consultar API externa", err);
+      }
+      return "";
+    }
+
+    async function onScanSuccess(decodedText) {
+      if (navigator.vibrate) navigator.vibrate(80);
+      playBeep();
+
+      currentBarcode = decodedText;
+      document.getElementById('disp-barcode').innerText = `CÓDIGO: ${currentBarcode}`;
+      
+      const db = getInventory();
+
+      if (db[currentBarcode]) {
+        // EXISTE EN TIENDA
+        document.getElementById('input-name').value = db[currentBarcode].name;
+        document.getElementById('input-price').value = db[currentBarcode].price;
+        document.getElementById('disp-status').innerText = "Registrado en tienda";
+        document.getElementById('disp-status').className = "text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold";
+        document.getElementById('btn-save').className = "w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl text-xs active:scale-95 transition shadow";
+      } else {
+        // NUEVO PRODUCTO - CONSULTAR API EXTERNA
+        document.getElementById('input-price').value = "";
+        const externalName = await fetchExternalProductName(currentBarcode);
+
+        if (externalName) {
+          document.getElementById('input-name').value = externalName;
+          document.getElementById('disp-status').innerText = "Encontrado en la red";
+          document.getElementById('disp-status').className = "text-[10px] px-2 py-0.5 rounded-full bg-green-900/50 text-green-300 font-semibold";
+        } else {
+          document.getElementById('input-name').value = "";
+          document.getElementById('disp-status').innerText = "Producto Nuevo";
+          document.getElementById('disp-status').className = "text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-semibold";
+        }
+
+        document.getElementById('btn-save').className = "w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl text-xs active:scale-95 transition shadow";
+      }
+
+      // Pausa estratégica de 2 segundos para no repetir lecturas seguidas
+      html5QrCode.pause();
+      setTimeout(() => { if (isScanning) html5QrCode.resume(); }, 2000);
+    }
+
+    function saveProduct() {
+      if (!currentBarcode) {
+        alert("Primero escanea un producto.");
+        return;
+      }
+
+      const name = document.getElementById('input-name').value.trim();
+      const price = parseFloat(document.getElementById('input-price').value);
+
+      if (!name || isNaN(price)) {
+        alert("Por favor ingresa un nombre y un precio válido.");
+        return;
+      }
+
+      const db = getInventory();
+      db[currentBarcode] = { name, price, updatedAt: new Date().toLocaleDateString() };
+      setInventory(db);
+
+      document.getElementById('disp-status').innerText = "¡Guardado con éxito!";
+      document.getElementById('disp-status').className = "text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 font-semibold";
+    }
+
+    function toggleCamera() {
+      if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+
+      if (isScanning) {
+        html5QrCode.stop().then(() => {
+          isScanning = false;
+          document.getElementById('btn-cam').innerText = "Iniciar Escáner";
+          document.getElementById('scanner-placeholder').classList.remove('hidden');
+        });
+      } else {
+        document.getElementById('scanner-placeholder').classList.add('hidden');
+        html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 12, qrbox: { width: 250, height: 140 } },
+          onScanSuccess
+        ).then(() => {
+          isScanning = true;
+          document.getElementById('btn-cam').innerText = "Detener Escáner";
+        }).catch(err => {
+          alert("Error de cámara: Permite los permisos de cámara y asegúrate de estar bajo HTTPS.");
+        });
+      }
+    }
+
+    function renderInventory() {
+      const db = getInventory();
+      const listContainer = document.getElementById('inventory-list');
+      const query = document.getElementById('search-inventory').value.toLowerCase();
+      
+      const keys = Object.keys(db);
+      document.getElementById('total-items').innerText = keys.length;
+
+      listContainer.innerHTML = '';
+
+      if (keys.length === 0) {
+        listContainer.innerHTML = `<p class="text-center text-[11px] text-zinc-600 py-4">No hay productos guardados aún.</p>`;
+        return;
+      }
+
+      keys.reverse().forEach(code => {
+        const item = db[code];
+        if (item.name.toLowerCase().includes(query) || code.includes(query)) {
+          listContainer.innerHTML += `
+            <div class="bg-zinc-900 border border-zinc-800/80 rounded-xl p-3 flex justify-between items-center text-xs">
+              <div class="space-y-0.5 pr-2">
+                <p class="font-bold text-zinc-200 leading-tight">${item.name}</p>
+                <p class="text-[9px] font-mono text-zinc-500">${code}</p>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <p class="font-black text-amber-300 text-sm">$${item.price.toFixed(2)}</p>
+                <button onclick="editFromList('${code}')" class="text-[9px] text-zinc-400 underline">Editar</button>
+              </div>
+            </div>
+          `;
+        }
+      });
+    }
+
+    function editFromList(code) {
+      const db = getInventory();
+      if (db[code]) {
+        currentBarcode = code;
+        document.getElementById('disp-barcode').innerText = `CÓDIGO: ${code}`;
+        document.getElementById('input-name').value = db[code].name;
+        document.getElementById('input-price').value = db[code].price;
+        document.getElementById('disp-status').innerText = "Editando desde lista";
+        document.getElementById('disp-status').className = "text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold";
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function exportData() {
+      const db = getInventory();
+      const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `inventario_reyes_magos_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+    }
+
+    // Render inicial
+    renderInventory();
+  </script>
+</body>
+</html>
