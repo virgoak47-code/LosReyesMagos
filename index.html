@@ -14,6 +14,7 @@
     #reader video {
       object-fit: cover !important;
       border-radius: 0.75rem;
+      width: 100% !important;
     }
   </style>
 </head>
@@ -58,8 +59,8 @@
           </button>
         </div>
         
-        <div id="reader" class="w-full bg-slate-950 rounded-xl overflow-hidden border border-slate-700 min-h-[220px] flex items-center justify-center text-slate-500 text-xs">
-          Cámara en espera...
+        <div id="reader" class="w-full bg-slate-950 rounded-xl overflow-hidden border border-slate-700 min-h-[250px] relative flex flex-col items-center justify-center text-slate-400 text-xs p-2">
+          <span id="readerStatus">Cámara en espera...</span>
         </div>
 
         <!-- Ingreso Manual de Código -->
@@ -260,38 +261,77 @@
       if (tab === 'pos') renderCart();
     }
 
-    // ESCÁNER DE CÓDIGO DE BARRAS
-    function toggleCamera() {
+    // CONTROL DE CÁMARA REFORZADO
+    async function toggleCamera() {
       const btn = document.getElementById('toggleCamBtn');
+      const status = document.getElementById('readerStatus');
+
+      if (typeof Html5Qrcode === 'undefined') {
+        alert("Error: La librería del escáner no cargó. Revisa tu conexión a internet e intenta recargar la página.");
+        return;
+      }
+
       if (html5QrcodeScanner) {
-        stopCamera();
+        await stopCamera();
         btn.innerText = "Iniciar Cámara";
         btn.classList.replace("bg-rose-500", "bg-amber-500");
-      } else {
+        return;
+      }
+
+      try {
+        btn.innerText = "Cargando...";
+        if (status) status.innerText = "Solicitando acceso a la cámara...";
+
+        const devices = await Html5Qrcode.getCameras();
+        
+        if (!devices || devices.length === 0) {
+          throw new Error("No se detectaron cámaras en este dispositivo.");
+        }
+
+        const backCamera = devices.find(d => 
+          d.label.toLowerCase().includes('back') || 
+          d.label.toLowerCase().includes('trasera') || 
+          d.label.toLowerCase().includes('environment')
+        ) || devices[devices.length - 1];
+
         html5QrcodeScanner = new Html5Qrcode("reader");
-        html5QrcodeScanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 150 } },
+
+        await html5QrcodeScanner.start(
+          backCamera.id,
+          {
+            fps: 15,
+            qrbox: { width: 250, height: 150 }
+          },
           (decodedText) => {
             playBeepSound();
             processBarcode(decodedText);
           },
           () => {}
-        ).then(() => {
-          btn.innerText = "Detener Cámara";
-          btn.classList.replace("bg-amber-500", "bg-rose-500");
-        }).catch(err => {
-          alert("Error al acceder a la cámara: " + err);
-        });
+        );
+
+        btn.innerText = "Detener Cámara";
+        btn.classList.replace("bg-amber-500", "bg-rose-500");
+
+      } catch (err) {
+        console.error("Error de cámara:", err);
+        btn.innerText = "Iniciar Cámara";
+        btn.classList.replace("bg-rose-500", "bg-amber-500");
+        html5QrcodeScanner = null;
+        document.getElementById('reader').innerHTML = `<span id="readerStatus" class="text-rose-400 p-2 text-center">Error: ${err.message || err}</span>`;
+        alert("No se pudo iniciar la cámara: " + (err.message || err));
       }
     }
 
-    function stopCamera() {
+    async function stopCamera() {
       if (html5QrcodeScanner) {
-        html5QrcodeScanner.stop().then(() => {
+        try {
+          await html5QrcodeScanner.stop();
+        } catch (e) {
+          console.warn("Fallo al detener la cámara limpiamente:", e);
+        } finally {
           html5QrcodeScanner = null;
-          document.getElementById('reader').innerText = "Cámara detenida.";
-        });
+          document.getElementById('reader').innerHTML = '<span id="readerStatus">Cámara en espera...</span>';
+        }
       }
     }
 
@@ -303,7 +343,6 @@
       document.getElementById('barcodeDisplay').innerText = code;
 
       if (db[code]) {
-        // Encontrado localmente
         const item = db[code];
         document.getElementById('prodName').value = item.name || '';
         document.getElementById('prodPrice').value = item.price || '';
@@ -313,7 +352,6 @@
         document.getElementById('sourceTag').innerText = "LOCAL";
         document.getElementById('sourceTag').className = "ml-2 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-900 text-emerald-300";
       } else {
-        // Consultar API Open Food Facts
         document.getElementById('prodName').value = "Buscando en Open Food Facts...";
         document.getElementById('prodPrice').value = '';
         document.getElementById('prodStock').value = '10';
@@ -376,7 +414,7 @@
       alert("Producto guardado correctamente.");
     }
 
-    // MODULO DE PUNTO DE VENTA (TICKET)
+    // MÓDULO DE PUNTO DE VENTA (TICKET)
     function addToCartFromScanner() {
       if (!currentBarcode || !db[currentBarcode]) {
         saveProduct();
@@ -405,31 +443,3 @@
         badge.classList.add('hidden');
       }
     }
-
-    function renderCart() {
-      const container = document.getElementById('cartList');
-      container.innerHTML = '';
-
-      if (cart.length === 0) {
-        container.innerHTML = `<p class="text-slate-500 text-xs text-center py-6">El carrito está vacío.</p>`;
-        document.getElementById('cartTotal').innerText = "$0.00";
-        return;
-      }
-
-      let grandTotal = 0;
-      cart.forEach((item, index) => {
-        const subtotal = item.price * item.qty;
-        grandTotal += subtotal;
-
-        const row = document.createElement('div');
-        row.className = "flex items-center justify-between bg-slate-900 p-2.5 rounded-lg text-xs border border-slate-700/60";
-        row.innerHTML = `
-          <div class="flex-1 pr-2">
-            <p class="font-medium text-slate-200">${item.name}</p>
-            <p class="text-slate-400 font-mono">$${item.price.toFixed(2)} c/u</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <button onclick="updateCartQty(${index}, -1)" class="w-6 h-6 bg-slate-700 text-slate-200 rounded flex items-center justify-center font-bold">-</button>
-            <span class="font-bold text-slate-100 w-4 text-center">${item.qty}</span>
-            <button onclick="updateCartQty(${index}, 1)" class="w-6 h-6 bg-slate-700 text-slate-200 rounded flex items-center justify-center font-bold">+</button>
-            
