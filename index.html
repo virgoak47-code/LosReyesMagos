@@ -119,7 +119,7 @@
       <div class="flex justify-between items-center">
         <span class="text-xs text-slate-400 font-semibold">Administración:</span>
         <button type="button" onclick="openInventoryModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-bold active:scale-95 transition flex items-center gap-1">
-          📋 Ver Inventario Completo
+          📋 Ver Catálogo Completo
         </button>
       </div>
       <div class="flex justify-end gap-2 pt-1 border-t border-slate-700/50">
@@ -354,7 +354,7 @@
       });
 
       if (matches === 0) {
-        container.innerHTML = `<p class="text-slate-500 text-center py-8 text-xs">No se encontraron coincidencia para "${query}".</p>`;
+        container.innerHTML = `<p class="text-slate-500 text-center py-8 text-xs">No se encontraron coincidencias para "${query}".</p>`;
       }
     }
 
@@ -467,4 +467,4 @@
       } else {
         const falta = Math.abs(change);
         changeDisplay.innerText = `Falta $${falta.toFixed(2)}`;
-        changeDisplay.className = "w-full bg-slate-950 border border-rose-500/50 rounded-lg
+        changeDisplay.className = "w-full bg-slate-950 border border-rose-500/50 rounded-lg 
