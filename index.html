@@ -7,14 +7,15 @@
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- HTML5-QRCode CDN -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <!-- HTML5-QRCode CDN desde CDNJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
   <style>
     #reader video {
       object-fit: cover !important;
       border-radius: 0.75rem;
       width: 100% !important;
+      height: 100% !important;
     }
   </style>
 </head>
@@ -197,6 +198,15 @@
   </main>
 
   <script>
+    // CAPTURA GLOBAL DE ERRORES EN PANTALLA
+    window.onerror = function (msg, url, lineNo) {
+      const reader = document.getElementById('reader');
+      if (reader) {
+        reader.innerHTML = `<div class="text-rose-400 text-xs p-3 text-center"><strong>Error JS:</strong> ${msg}<br><span class="text-[10px] text-slate-400">Línea ${lineNo}</span></div>`;
+      }
+      return false;
+    };
+
     // ESTADO Y BASE DE DATOS LOCAL
     const DB_KEY = 'reyes_magos_db';
     let db = JSON.parse(localStorage.getItem(DB_KEY)) || {};
@@ -206,7 +216,6 @@
     let filterLowStockOnly = false;
     let audioCtx = null;
 
-    // Inicialización
     document.addEventListener("DOMContentLoaded", () => {
       updateBadge();
       renderInventory();
@@ -241,7 +250,7 @@
         osc.start();
         osc.stop(audioCtx.currentTime + 0.1);
       } catch (e) {
-        console.warn("AudioContext bloqueado o no soportado.", e);
+        console.warn("AudioContext no disponible", e);
       }
     }
 
@@ -261,13 +270,13 @@
       if (tab === 'pos') renderCart();
     }
 
-    // CONTROL DE CÁMARA REFORZADO
+    // CONTROL DE CÁMARA BLINDADO
     async function toggleCamera() {
       const btn = document.getElementById('toggleCamBtn');
-      const status = document.getElementById('readerStatus');
+      const readerEl = document.getElementById('reader');
 
       if (typeof Html5Qrcode === 'undefined') {
-        alert("Error: La librería del escáner no cargó. Revisa tu conexión a internet e intenta recargar la página.");
+        alert("La librería Html5Qrcode no está cargada. Revisa tu conexión a internet.");
         return;
       }
 
@@ -278,47 +287,64 @@
         return;
       }
 
+      btn.innerText = "Solicitando...";
+      readerEl.innerHTML = `<span class="text-amber-400 animate-pulse text-xs">Iniciando sensor de cámara...</span>`;
+
       try {
-        btn.innerText = "Cargando...";
-        if (status) status.innerText = "Solicitando acceso a la cámara...";
-
-        const devices = await Html5Qrcode.getCameras();
-        
-        if (!devices || devices.length === 0) {
-          throw new Error("No se detectaron cámaras en este dispositivo.");
-        }
-
-        const backCamera = devices.find(d => 
-          d.label.toLowerCase().includes('back') || 
-          d.label.toLowerCase().includes('trasera') || 
-          d.label.toLowerCase().includes('environment')
-        ) || devices[devices.length - 1];
-
         html5QrcodeScanner = new Html5Qrcode("reader");
 
-        await html5QrcodeScanner.start(
-          backCamera.id,
-          {
-            fps: 15,
-            qrbox: { width: 250, height: 150 }
-          },
-          (decodedText) => {
-            playBeepSound();
-            processBarcode(decodedText);
-          },
-          () => {}
-        );
+        const config = { fps: 15, qrbox: { width: 250, height: 150 } };
+        
+        const qrSuccess = (decodedText) => {
+          playBeepSound();
+          processBarcode(decodedText);
+        };
+
+        try {
+          // Intento 1: Cámara trasera directa por constraint
+          await html5QrcodeScanner.start(
+            { facingMode: "environment" },
+            config,
+            qrSuccess,
+            () => {}
+          );
+        } catch (e1) {
+          console.warn("Fallo facingMode environment, intentando enumerateDevices...", e1);
+          // Intento 2: Buscar ID de cámara trasera explícito
+          const devices = await Html5Qrcode.getCameras();
+          if (devices && devices.length > 0) {
+            const backCam = devices.find(d => 
+              d.label.toLowerCase().includes('back') || 
+              d.label.toLowerCase().includes('trasera') || 
+              d.label.toLowerCase().includes('rear')
+            ) || devices[devices.length - 1];
+
+            await html5QrcodeScanner.start(
+              backCam.id,
+              config,
+              qrSuccess,
+              () => {}
+            );
+          } else {
+            throw e1;
+          }
+        }
 
         btn.innerText = "Detener Cámara";
         btn.classList.replace("bg-amber-500", "bg-rose-500");
 
       } catch (err) {
-        console.error("Error de cámara:", err);
+        console.error("Error al iniciar cámara:", err);
         btn.innerText = "Iniciar Cámara";
         btn.classList.replace("bg-rose-500", "bg-amber-500");
         html5QrcodeScanner = null;
-        document.getElementById('reader').innerHTML = `<span id="readerStatus" class="text-rose-400 p-2 text-center">Error: ${err.message || err}</span>`;
-        alert("No se pudo iniciar la cámara: " + (err.message || err));
+        
+        let errorMsg = err.message || err;
+        if (errorMsg.includes("NotAllowedError") || errorMsg.includes("Permission")) {
+          errorMsg = "Permiso de cámara denegado. Concede permisos a la web en la configuración de Chrome.";
+        }
+        
+        readerEl.innerHTML = `<div class="text-rose-400 text-xs p-3 text-center"><strong>⚠️ No se activó la cámara</strong><br>${errorMsg}</div>`;
       }
     }
 
@@ -327,7 +353,7 @@
         try {
           await html5QrcodeScanner.stop();
         } catch (e) {
-          console.warn("Fallo al detener la cámara limpiamente:", e);
+          console.warn("Error al detener cámara:", e);
         } finally {
           html5QrcodeScanner = null;
           document.getElementById('reader').innerHTML = '<span id="readerStatus">Cámara en espera...</span>';
@@ -383,7 +409,7 @@
           return data.product.product_name_es || data.product.product_name || null;
         }
       } catch (err) {
-        console.warn("Fallo de red al consultar Open Food Facts:", err);
+        console.warn("Error en la consulta Open Food Facts:", err);
       }
       return null;
     }
@@ -407,39 +433,4 @@
         price,
         stock,
         minStock,
-        updatedAt: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
-      };
-
-      saveDB();
-      alert("Producto guardado correctamente.");
-    }
-
-    // MÓDULO DE PUNTO DE VENTA (TICKET)
-    function addToCartFromScanner() {
-      if (!currentBarcode || !db[currentBarcode]) {
-        saveProduct();
-      }
-      const item = db[currentBarcode];
-      if (!item) return;
-
-      const existing = cart.find(c => c.code === currentBarcode);
-      if (existing) {
-        existing.qty += 1;
-      } else {
-        cart.push({ code: currentBarcode, name: item.name, price: item.price, qty: 1 });
-      }
-
-      updateCartBadge();
-      alert(`Agregado: ${item.name}`);
-    }
-
-    function updateCartBadge() {
-      const badge = document.getElementById('cartBadge');
-      const totalItems = cart.reduce((acc, i) => acc + i.qty, 0);
-      if (totalItems > 0) {
-        badge.innerText = totalItems;
-        badge.classList.remove('hidden');
-      } else {
-        badge.classList.add('hidden');
-      }
-    }
+ 
