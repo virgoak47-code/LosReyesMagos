@@ -4,18 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Abarrotes Reyes Magos - Control de Precios e Inventario</title>
-
-  <!-- Tailwind CSS CDN -->
+  
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- HTML5-QRCode CDN desde CDNJS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <!-- HTML5-QRCode CDN Estable -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
   <style>
     #reader video {
       object-fit: cover !important;
       border-radius: 0.75rem;
       width: 100% !important;
-      height: 100% !important;
     }
   </style>
 </head>
@@ -52,20 +51,24 @@
 
     <!-- SECCIÓN 1: ESCÁNER Y EDICIÓN -->
     <section id="sec-scan" class="space-y-4">
-      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
-        <div class="flex items-center justify-between mb-3">
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
           <h2 class="font-semibold text-slate-200 text-sm">Cámara / Lectura de Código</h2>
-          <button id="toggleCamBtn" onclick="toggleCamera()" class="px-3 py-1 bg-amber-500 text-slate-950 text-xs font-bold rounded-lg hover:bg-amber-400 transition">
+          <button id="toggleCamBtn" onclick="toggleCamera()" class="px-4 py-2 bg-amber-500 text-slate-950 text-xs font-bold rounded-lg hover:bg-amber-400 transition">
             Iniciar Cámara
           </button>
         </div>
         
-        <div id="reader" class="w-full bg-slate-950 rounded-xl overflow-hidden border border-slate-700 min-h-[250px] relative flex flex-col items-center justify-center text-slate-400 text-xs p-2">
-          <span id="readerStatus">Cámara en espera...</span>
+        <!-- Visor Limpio de Cámara -->
+        <div class="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950 min-h-[200px] flex items-center justify-center">
+          <div id="reader" class="w-full"></div>
+          <div id="scanner-placeholder" class="p-8 text-center text-xs text-slate-400 absolute">
+            Cámara apagada. Presiona "Iniciar Cámara" para escanear.
+          </div>
         </div>
 
         <!-- Ingreso Manual de Código -->
-        <div class="mt-3 flex gap-2">
+        <div class="flex gap-2">
           <input type="text" id="manualBarcode" placeholder="EAN-13 / UPC Manual..." class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
           <button onclick="processBarcode(document.getElementById('manualBarcode').value.trim())" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm text-slate-200 font-medium transition">
             Buscar
@@ -122,9 +125,7 @@
           <button onclick="clearCart()" class="text-xs text-rose-400 hover:underline">Vaciar Carrito</button>
         </div>
 
-        <div id="cartList" class="space-y-2 max-h-[350px] overflow-y-auto pr-1">
-          <!-- Items del carrito -->
-        </div>
+        <div id="cartList" class="space-y-2 max-h-[350px] overflow-y-auto pr-1"></div>
 
         <div class="border-t border-slate-700 pt-3 space-y-2">
           <div class="flex justify-between items-center text-lg font-bold">
@@ -159,9 +160,7 @@
                 <th class="p-2 text-right">Acción</th>
               </tr>
             </thead>
-            <tbody id="inventoryTable" class="divide-y divide-slate-700/50">
-              <!-- Carga dinámica -->
-            </tbody>
+            <tbody id="inventoryTable" class="divide-y divide-slate-700/50"></tbody>
           </table>
         </div>
       </div>
@@ -198,23 +197,13 @@
   </main>
 
   <script>
-    // CAPTURA GLOBAL DE ERRORES EN PANTALLA
-    window.onerror = function (msg, url, lineNo) {
-      const reader = document.getElementById('reader');
-      if (reader) {
-        reader.innerHTML = `<div class="text-rose-400 text-xs p-3 text-center"><strong>Error JS:</strong> ${msg}<br><span class="text-[10px] text-slate-400">Línea ${lineNo}</span></div>`;
-      }
-      return false;
-    };
-
-    // ESTADO Y BASE DE DATOS LOCAL
     const DB_KEY = 'reyes_magos_db';
     let db = JSON.parse(localStorage.getItem(DB_KEY)) || {};
     let cart = [];
-    let html5QrcodeScanner = null;
+    let html5QrCode = null;
+    let isScanning = false;
     let currentBarcode = null;
     let filterLowStockOnly = false;
-    let audioCtx = null;
 
     document.addEventListener("DOMContentLoaded", () => {
       updateBadge();
@@ -231,30 +220,21 @@
       document.getElementById('statusBadge').innerText = `${count} Productos Registrados`;
     }
 
-    // SONIDO DE ESCANEO
     function playBeepSound() {
       try {
-        if (!audioCtx) {
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = 1000;
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
         osc.connect(gain);
-        gain.connect(audioCtx.destination);
+        gain.connect(ctx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.1);
-      } catch (e) {
-        console.warn("AudioContext no disponible", e);
-      }
+        osc.stop(ctx.currentTime + 0.12);
+      } catch(e){}
     }
 
-    // CONTROL DE PESTAÑAS
     function switchTab(tab) {
       ['scan', 'pos', 'inventory', 'data'].forEach(t => {
         document.getElementById(`sec-${t}`).classList.add('hidden');
@@ -270,98 +250,60 @@
       if (tab === 'pos') renderCart();
     }
 
-    // CONTROL DE CÁMARA BLINDADO
-    async function toggleCamera() {
-      const btn = document.getElementById('toggleCamBtn');
-      const readerEl = document.getElementById('reader');
-
+    // CONTROL DE CÁMARA (Estructura Limpia del Código 1)
+    function toggleCamera() {
       if (typeof Html5Qrcode === 'undefined') {
-        alert("La librería Html5Qrcode no está cargada. Revisa tu conexión a internet.");
+        alert("La librería de escáner no ha cargado. Verifica tu conexión.");
         return;
       }
 
-      if (html5QrcodeScanner) {
-        await stopCamera();
-        btn.innerText = "Iniciar Cámara";
-        btn.classList.replace("bg-rose-500", "bg-amber-500");
-        return;
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("reader");
       }
 
-      btn.innerText = "Solicitando...";
-      readerEl.innerHTML = `<span class="text-amber-400 animate-pulse text-xs">Iniciando sensor de cámara...</span>`;
+      const btn = document.getElementById('toggleCamBtn');
+      const placeholder = document.getElementById('scanner-placeholder');
 
-      try {
-        html5QrcodeScanner = new Html5Qrcode("reader");
-
-        const config = { fps: 15, qrbox: { width: 250, height: 150 } };
+      if (isScanning) {
+        html5QrCode.stop().then(() => {
+          isScanning = false;
+          btn.innerText = "Iniciar Cámara";
+          btn.classList.replace("bg-rose-500", "bg-amber-500");
+          placeholder.classList.remove('hidden');
+        }).catch(err => console.error("Error al detener cámara:", err));
+      } else {
+        placeholder.classList.add('hidden');
         
-        const qrSuccess = (decodedText) => {
-          playBeepSound();
-          processBarcode(decodedText);
-        };
-
-        try {
-          // Intento 1: Cámara trasera directa por constraint
-          await html5QrcodeScanner.start(
-            { facingMode: "environment" },
-            config,
-            qrSuccess,
-            () => {}
-          );
-        } catch (e1) {
-          console.warn("Fallo facingMode environment, intentando enumerateDevices...", e1);
-          // Intento 2: Buscar ID de cámara trasera explícito
-          const devices = await Html5Qrcode.getCameras();
-          if (devices && devices.length > 0) {
-            const backCam = devices.find(d => 
-              d.label.toLowerCase().includes('back') || 
-              d.label.toLowerCase().includes('trasera') || 
-              d.label.toLowerCase().includes('rear')
-            ) || devices[devices.length - 1];
-
-            await html5QrcodeScanner.start(
-              backCam.id,
-              config,
-              qrSuccess,
-              () => {}
-            );
-          } else {
-            throw e1;
-          }
-        }
-
-        btn.innerText = "Detener Cámara";
-        btn.classList.replace("bg-amber-500", "bg-rose-500");
-
-      } catch (err) {
-        console.error("Error al iniciar cámara:", err);
-        btn.innerText = "Iniciar Cámara";
-        btn.classList.replace("bg-rose-500", "bg-amber-500");
-        html5QrcodeScanner = null;
-        
-        let errorMsg = err.message || err;
-        if (errorMsg.includes("NotAllowedError") || errorMsg.includes("Permission")) {
-          errorMsg = "Permiso de cámara denegado. Concede permisos a la web en la configuración de Chrome.";
-        }
-        
-        readerEl.innerHTML = `<div class="text-rose-400 text-xs p-3 text-center"><strong>⚠️ No se activó la cámara</strong><br>${errorMsg}</div>`;
+        html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 12, qrbox: { width: 250, height: 140 } },
+          onScanSuccess
+        ).then(() => {
+          isScanning = true;
+          btn.innerText = "Detener Cámara";
+          btn.classList.replace("bg-amber-500", "bg-rose-500");
+        }).catch(err => {
+          console.error("Error al iniciar cámara:", err);
+          placeholder.classList.remove('hidden');
+          alert("No se pudo acceder a la cámara. Asegúrate de otorgar permisos en el navegador y usar HTTPS o GitHub Pages.");
+        });
       }
     }
 
-    async function stopCamera() {
-      if (html5QrcodeScanner) {
-        try {
-          await html5QrcodeScanner.stop();
-        } catch (e) {
-          console.warn("Error al detener cámara:", e);
-        } finally {
-          html5QrcodeScanner = null;
-          document.getElementById('reader').innerHTML = '<span id="readerStatus">Cámara en espera...</span>';
+    function onScanSuccess(decodedText) {
+      if (navigator.vibrate) navigator.vibrate(80);
+      playBeepSound();
+      processBarcode(decodedText);
+
+      // Pausa de 2 segundos para evitar lecturas duplicadas
+      html5QrCode.pause();
+      setTimeout(() => {
+        if (isScanning && html5QrCode) {
+          html5QrCode.resume();
         }
-      }
+      }, 2000);
     }
 
-    // PROCESAMIENTO DE CÓDIGO
     async function processBarcode(code) {
       if (!code) return;
       currentBarcode = code;
@@ -378,7 +320,7 @@
         document.getElementById('sourceTag').innerText = "LOCAL";
         document.getElementById('sourceTag').className = "ml-2 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-900 text-emerald-300";
       } else {
-        document.getElementById('prodName').value = "Buscando en Open Food Facts...";
+        document.getElementById('prodName').value = "Buscando en red pública...";
         document.getElementById('prodPrice').value = '';
         document.getElementById('prodStock').value = '10';
         document.getElementById('prodMinStock').value = '2';
@@ -393,7 +335,7 @@
           document.getElementById('sourceTag').className = "ml-2 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-blue-900 text-blue-300";
         } else {
           document.getElementById('prodName').value = '';
-          document.getElementById('prodName').placeholder = "Sin coincidencias. Ingrese nombre manualmente.";
+          document.getElementById('prodName').placeholder = "Sin coincidencia. Ingrese nombre manualmente.";
           document.getElementById('sourceTag').innerText = "NUEVO";
           document.getElementById('sourceTag').className = "ml-2 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-700 text-slate-300";
         }
@@ -409,14 +351,16 @@
           return data.product.product_name_es || data.product.product_name || null;
         }
       } catch (err) {
-        console.warn("Error en la consulta Open Food Facts:", err);
+        console.warn("Error Open Food Facts:", err);
       }
       return null;
     }
 
-    // GUARDAR PRODUCTO
     function saveProduct() {
-      if (!currentBarcode) return;
+      if (!currentBarcode) {
+        alert("Primero escanea un código.");
+        return;
+      }
 
       const name = document.getElementById('prodName').value.trim();
       const price = parseFloat(document.getElementById('prodPrice').value) || 0;
@@ -433,4 +377,62 @@
         price,
         stock,
         minStock,
- 
+        updatedAt: new Date().toLocaleDateString('es-MX')
+      };
+
+      saveDB();
+      document.getElementById('sourceTag').innerText = "GUARDADO";
+      document.getElementById('sourceTag').className = "ml-2 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-900 text-emerald-300";
+    }
+
+    function addToCartFromScanner() {
+      if (!currentBarcode) return;
+      if (!db[currentBarcode]) saveProduct();
+
+      const item = db[currentBarcode];
+      if (!item) return;
+
+      const existing = cart.find(c => c.code === currentBarcode);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        cart.push({ code: currentBarcode, name: item.name, price: item.price, qty: 1 });
+      }
+
+      updateCartBadge();
+    }
+
+    function updateCartBadge() {
+      const badge = document.getElementById('cartBadge');
+      const totalItems = cart.reduce((acc, i) => acc + i.qty, 0);
+      if (totalItems > 0) {
+        badge.innerText = totalItems;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    function renderCart() {
+      const container = document.getElementById('cartList');
+      container.innerHTML = '';
+
+      if (cart.length === 0) {
+        container.innerHTML = `<p class="text-slate-500 text-xs text-center py-6">El carrito está vacío.</p>`;
+        document.getElementById('cartTotal').innerText = "$0.00";
+        return;
+      }
+
+      let grandTotal = 0;
+      cart.forEach((item, index) => {
+        const subtotal = item.price * item.qty;
+        grandTotal += subtotal;
+
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between bg-slate-900 p-2.5 rounded-lg text-xs border border-slate-700/60";
+        row.innerHTML = `
+          <div class="flex-1 pr-2">
+            <p class="font-medium text-slate-200">${item.name}</p>
+            <p class="text-slate-400 font-mono">$${item.price.toFixed(2)} c/u</p>
+          </div>
+          <div class="flex items-center gap-2">
