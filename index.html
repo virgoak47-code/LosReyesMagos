@@ -38,10 +38,12 @@
         <span class="text-2xl">🏪</span>
         <div>
           <h1 class="font-bold text-base text-amber-400 leading-tight">Abarrotes Reyes Magos</h1>
-          <p class="text-[11px] text-slate-400">Punto de Venta <span class="text-emerald-400 font-bold">[v4.0 CONTINUO]</span></p>
+          <p class="text-[11px] text-slate-400">Punto de Venta <span class="text-emerald-400 font-bold">[v4.1 INTELIGENTE]</span></p>
         </div>
       </div>
-      <div id="statusBadge" class="text-[11px] bg-slate-700 px-2.5 py-1 rounded-full text-slate-300 font-mono">0 Prod.</div>
+      <button type="button" onclick="openInventoryModal()" id="statusBadge" class="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-3 py-1 rounded-full text-amber-400 font-bold font-mono active:scale-95 transition">
+        0 Prod.
+      </button>
     </div>
   </header>
 
@@ -112,48 +114,78 @@
       </div>
     </div>
 
-    <!-- MODAL / ALTA RÁPIDA DE PRODUCTO NUEVO -->
-    <div id="newProductModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="bg-slate-800 border border-amber-500/50 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
-        <div class="flex justify-between items-center">
-          <h3 class="font-bold text-amber-400 text-sm">📦 Producto No Registrado</h3>
-          <button type="button" onclick="closeNewProductModal()" class="text-slate-400 text-xs font-bold">✕</button>
-        </div>
-
-        <p class="text-xs text-slate-300">Código: <span id="modalBarcode" class="font-mono bg-slate-900 px-2 py-0.5 rounded text-amber-300"></span></p>
-
-        <div>
-          <label class="block text-xs text-slate-400 mb-1">Nombre del Producto</label>
-          <input type="text" id="newProdName" placeholder="Ej. Coca Cola 600ml" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
-        </div>
-
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">Precio Venta ($)</label>
-            <input type="number" step="0.5" id="newProdPrice" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-emerald-400 font-bold focus:outline-none focus:border-amber-500">
-          </div>
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">Stock Inicial</label>
-            <input type="number" id="newProdStock" value="10" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
-          </div>
-        </div>
-
-        <button type="button" onclick="saveAndAddProduct()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl active:scale-95 transition text-xs uppercase">
-          Guardar y Sumar a Ticket
+    <!-- ACCIONES Y GESTIÓN DE INVENTARIO -->
+    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-2">
+      <div class="flex justify-between items-center">
+        <span class="text-xs text-slate-400 font-semibold">Administración:</span>
+        <button type="button" onclick="openInventoryModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-bold active:scale-95 transition flex items-center gap-1">
+          📋 Ver Inventario Completo
         </button>
       </div>
-    </div>
-
-    <!-- ACCIONES DE BASE DE DATOS -->
-    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center text-xs">
-      <span class="text-slate-400">Opciones de Inventario:</span>
-      <div class="flex gap-2">
-        <button type="button" onclick="exportJSON()" class="bg-slate-700 px-3 py-1.5 rounded text-slate-200 font-semibold">Exportar Copy</button>
-        <button type="button" onclick="clearAllData()" class="bg-rose-950/60 text-rose-300 px-3 py-1.5 rounded font-semibold border border-rose-800/40">Borrar DB</button>
+      <div class="flex justify-end gap-2 pt-1 border-t border-slate-700/50">
+        <button type="button" onclick="exportJSON()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-slate-200 text-xs font-semibold">Exportar Copia</button>
+        <button type="button" onclick="clearAllData()" class="bg-rose-950/60 text-rose-300 hover:bg-rose-900/60 px-3 py-1.5 rounded text-xs font-semibold border border-rose-800/40">Borrar DB</button>
       </div>
     </div>
 
   </main>
+
+  <!-- MODAL / ALTA RÁPIDA DE PRODUCTO NUEVO -->
+  <div id="newProductModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-amber-500/50 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-amber-400 text-sm">📦 Producto No Registrado</h3>
+        <button type="button" onclick="closeNewProductModal()" class="text-slate-400 text-xs font-bold">✕</button>
+      </div>
+
+      <p class="text-xs text-slate-300">Código: <span id="modalBarcode" class="font-mono bg-slate-900 px-2 py-0.5 rounded text-amber-300"></span></p>
+
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Nombre del Producto</label>
+        <input type="text" id="newProdName" placeholder="Ej. Coca Cola 600ml" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Precio Venta ($)</label>
+          <input type="number" step="0.5" id="newProdPrice" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-emerald-400 font-bold focus:outline-none focus:border-amber-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Stock Inicial</label>
+          <input type="number" id="newProdStock" value="10" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+        </div>
+      </div>
+
+      <button type="button" onclick="saveAndAddProduct()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl active:scale-95 transition text-xs uppercase">
+        Guardar y Sumar a Ticket
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL / CONSULTA Y EDICIÓN DE INVENTARIO COMPLETO -->
+  <div id="inventoryModal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 w-full max-w-md h-[80vh] flex flex-col shadow-2xl space-y-3">
+      <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+        <div>
+          <h3 class="font-bold text-amber-400 text-base">📋 Catálogo de Productos</h3>
+          <p class="text-[11px] text-slate-400" id="invTotalCount">0 productos registrados</p>
+        </div>
+        <button type="button" onclick="closeInventoryModal()" class="text-slate-400 hover:text-slate-100 text-lg font-bold px-2">✕</button>
+      </div>
+
+      <!-- Buscador interno -->
+      <input type="text" id="invSearchInput" oninput="renderInventoryList()" placeholder="🔍 Buscar por nombre o código..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500">
+
+      <!-- Lista de productos -->
+      <div id="inventoryModalList" class="flex-1 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-700/40">
+        <!-- Render dinámico -->
+      </div>
+
+      <button type="button" onclick="closeInventoryModal()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-2.5 rounded-xl text-xs uppercase">
+        Cerrar Catálogo
+      </button>
+    </div>
+  </div>
 
   <script>
     // Capturador de errores JS
@@ -193,11 +225,13 @@
     }
 
     function updateBadge() {
+      const count = Object.keys(db).length;
       const badge = document.getElementById('statusBadge');
-      if (badge) badge.innerText = `${Object.keys(db).length} Prod.`;
+      if (badge) badge.innerText = `${count} Prod.`;
+      const invCount = document.getElementById('invTotalCount');
+      if (invCount) invCount.innerText = `${count} producto(s) en catálogo`;
     }
 
-    // Beep sintético con Web Audio API
     function playBeep() {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -226,7 +260,6 @@
     function processBarcode(code) {
       if (!code) return;
 
-      // Cooldown de 1.5 segundos para evitar lecturas duplicadas por cámara
       const now = Date.now();
       if (code === lastScanCode && (now - lastScanTime) < 1500) {
         return;
@@ -238,10 +271,8 @@
       playBeep();
 
       if (db[code]) {
-        // Producto Existe: Agregar directo al ticket
         addToCart(code);
       } else {
-        // Producto Nuevo: Abrir Modal
         pendingBarcode = code;
         document.getElementById('modalBarcode').innerText = code;
         document.getElementById('newProdName').value = '';
@@ -271,6 +302,82 @@
     function closeNewProductModal() {
       document.getElementById('newProductModal').classList.add('hidden');
       pendingBarcode = null;
+    }
+
+    function openInventoryModal() {
+      document.getElementById('inventoryModal').classList.remove('hidden');
+      renderInventoryList();
+    }
+
+    function closeInventoryModal() {
+      document.getElementById('inventoryModal').classList.add('hidden');
+    }
+
+    function renderInventoryList() {
+      const container = document.getElementById('inventoryModalList');
+      const query = (document.getElementById('invSearchInput').value || '').toLowerCase().trim();
+      if (!container) return;
+      container.innerHTML = '';
+
+      const keys = Object.keys(db);
+      if (keys.length === 0) {
+        container.innerHTML = `<p class="text-slate-500 text-center py-8 text-xs">No hay productos guardados aún.</p>`;
+        return;
+      }
+
+      let matches = 0;
+      keys.reverse().forEach(code => {
+        const item = db[code];
+        const matchName = item.name ? item.name.toLowerCase().includes(query) : false;
+        const matchCode = code.includes(query);
+
+        if (query && !matchName && !matchCode) return;
+        matches++;
+
+        container.innerHTML += `
+          <div class="pt-2 pb-1 flex justify-between items-center">
+            <div class="pr-2">
+              <p class="font-bold text-slate-100 text-xs">${item.name}</p>
+              <p class="font-mono text-[10px] text-slate-400">${code}</p>
+            </div>
+            <div class="text-right flex items-center gap-2">
+              <div>
+                <p class="text-emerald-400 font-bold text-xs">$${(item.price || 0).toFixed(2)}</p>
+                <p class="text-[10px] text-slate-400">Stock: <span class="font-bold text-slate-200">${item.stock || 0}</span></p>
+              </div>
+              <button type="button" onclick="editProductPrompt('${code}')" class="bg-slate-700 hover:bg-slate-600 p-1.5 rounded text-amber-400 text-xs font-bold">
+                ✏️
+              </button>
+            </div>
+          </div>
+        `;
+      });
+
+      if (matches === 0) {
+        container.innerHTML = `<p class="text-slate-500 text-center py-8 text-xs">No se encontraron coincidencia para "${query}".</p>`;
+      }
+    }
+
+    function editProductPrompt(code) {
+      const item = db[code];
+      if (!item) return;
+
+      const newName = prompt("Editar nombre:", item.name);
+      if (newName === null) return;
+      const newPrice = prompt("Editar precio ($):", item.price);
+      if (newPrice === null) return;
+      const newStock = prompt("Editar stock:", item.stock);
+      if (newStock === null) return;
+
+      db[code] = {
+        name: newName.trim() || item.name,
+        price: parseFloat(newPrice) || 0,
+        stock: parseInt(newStock) || 0
+      };
+
+      saveDB();
+      renderInventoryList();
+      renderCart();
     }
 
     function addToCart(code) {
@@ -360,94 +467,4 @@
       } else {
         const falta = Math.abs(change);
         changeDisplay.innerText = `Falta $${falta.toFixed(2)}`;
-        changeDisplay.className = "w-full bg-slate-950 border border-rose-500/50 rounded-lg px-3 py-2 text-xs font-bold text-rose-400 flex items-center font-mono";
-      }
-    }
-
-    function completeSale() {
-      if (cart.length === 0) return alert("El ticket está vacío.");
-      
-      const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-      const payInput = document.getElementById('payAmount');
-      const pay = parseFloat(payInput ? payInput.value : 0) || 0;
-
-      if (pay < total) {
-        return alert(`El efectivo ingresado ($${pay.toFixed(2)}) es menor al total ($${total.toFixed(2)}).`);
-      }
-
-      // Descontar inventario
-      cart.forEach(item => {
-        if (db[item.code]) {
-          db[item.code].stock = Math.max(0, (db[item.code].stock || 0) - item.qty);
-        }
-      });
-
-      saveDB();
-      const cambioFinal = pay - total;
-      alert(`✅ ¡Venta Cobrada con Éxito!\n\nTotal: $${total.toFixed(2)}\nEfectivo: $${pay.toFixed(2)}\nCambio a Entregar: $${cambioFinal.toFixed(2)}`);
-      
-      clearCart();
-    }
-
-    async function toggleCamera() {
-      const btn = document.getElementById('toggleCamBtn');
-      const placeholder = document.getElementById('scanner-placeholder');
-
-      if (typeof Html5Qrcode === 'undefined') {
-        alert("El motor de escaneo no cargó. Revisa tu conexión a internet.");
-        return;
-      }
-
-      if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-
-      if (isScanning) {
-        try {
-          await html5QrCode.stop();
-          isScanning = false;
-          btn.innerText = "Encender Cámara";
-          btn.className = "px-3.5 py-2 bg-amber-500 text-slate-950 text-xs font-bold rounded-lg active:scale-95 transition";
-          if (placeholder) placeholder.style.display = 'block';
-        } catch (err) {}
-      } else {
-        try {
-          if (placeholder) placeholder.style.display = 'none';
-
-          await html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 240, height: 140 } },
-            (decodedText) => {
-              processBarcode(decodedText);
-            },
-            () => {}
-          );
-
-          isScanning = true;
-          btn.innerText = "Apagar Cámara";
-          btn.className = "px-3.5 py-2 bg-rose-500 text-slate-100 text-xs font-bold rounded-lg active:scale-95 transition";
-
-        } catch (err) {
-          if (placeholder) placeholder.style.display = 'block';
-          alert("Permiso de cámara denegado o bloqueado.");
-        }
-      }
-    }
-
-    function exportJSON() {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
-      const a = document.createElement('a');
-      a.href = dataStr;
-      a.download = `inventario_${new Date().toISOString().slice(0,10)}.json`;
-      a.click();
-    }
-
-    function clearAllData() {
-      if (confirm("¿Borrar todo el inventario guardado?")) {
-        localStorage.removeItem(DB_KEY);
-        db = {};
-        updateBadge();
-        alert("Base de datos borrada.");
-      }
-    }
-  </script>
-</body>
-</html>
+        changeDisplay.className = "w-full bg-slate-950 border border-rose-500/50 rounded-lg
