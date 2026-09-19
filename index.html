@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Abarrotes Reyes Magos - POS Pro</title>
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" onerror="window.camLibFailed=true"></script>
 
   <style>
     :root {
@@ -41,8 +39,7 @@
     .input:focus { border-color: var(--amber); }
     
     .scanner-container { background: #020617; border-radius: 8px; padding: 8px; text-align: center; margin-bottom: 10px; border: 1px solid var(--border); }
-    #reader { width: 100%; min-height: 120px; border-radius: 6px; overflow: hidden; }
-    #reader video { width: 100% !important; max-height: 200px; object-fit: cover; }
+    #videoElement { width: 100%; height: 180px; object-fit: cover; border-radius: 6px; background: #000; display: none; }
     
     .flex-gap { display: flex; gap: 8px; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -64,7 +61,7 @@
   <div class="header">
     <div>
       <div class="title">🏪 Abarrotes Reyes Magos</div>
-      <div class="version">Punto de Venta [v6.2 Pro]</div>
+      <div class="version">Punto de Venta [v6.3 Nativo]</div>
     </div>
     <div class="flex-gap">
       <button class="btn btn-sky btn-xs" onclick="openCutModal()">📊 Corte</button>
@@ -81,13 +78,13 @@
 
     <div class="scanner-container">
       <div id="camStatus" style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">📷 Cámara Apagada</div>
-      <div id="reader"></div>
+      <video id="videoElement" autoplay playsinline muted></video>
     </div>
 
     <div class="flex-gap" style="margin-bottom: 10px;">
       <label class="btn btn-slate" style="font-size: 11px; cursor: pointer;">
-        📷 Capturar Foto de Código
-        <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="scanImage(this)">
+        📷 Capturar Foto de Código o Producto
+        <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleImageInput(this)">
       </label>
     </div>
 
@@ -183,15 +180,15 @@
   </div>
 
   <script>
+    const DB_KEY = 'reyes_magos_v63_db';
+    const SALES_KEY = 'reyes_magos_v63_sales';
+    
+    let db = {}, sales = [], cart = [], mediaStream = null, isScanning = false, editingCode = null;
+
     function setStatus(msg) {
       const el = document.getElementById('camStatus');
       if (el) el.innerText = msg;
     }
-
-    const DB_KEY = 'reyes_magos_v62_db';
-    const SALES_KEY = 'reyes_magos_v62_sales';
-    
-    let db = {}, sales = [], cart = [], scanner = null, isScanning = false, editingCode = null;
 
     window.onload = function() {
       try {
@@ -361,7 +358,6 @@
       if (cart.length === 0) return alert("Agrega productos primero.");
       if (pay < total) return alert(`Ingresa un pago mayor o igual a $${total.toFixed(2)}`);
 
-      // Descontar stock
       cart.forEach(item => {
         if (db[item.code]) {
           db[item.code].stock -= item.qty;
@@ -370,7 +366,6 @@
       });
       localStorage.setItem(DB_KEY, JSON.stringify(db));
 
-      // Guardar venta para el corte
       sales.push({ date: new Date().toISOString(), total, items: [...cart] });
       localStorage.setItem(SALES_KEY, JSON.stringify(sales));
 
@@ -380,21 +375,15 @@
     }
 
     async function toggleCam() {
-      if (window.camLibFailed || typeof Html5Qrcode === 'undefined') {
-        return alert("No se pudo cargar la librería de cámara.");
-      }
-
       const btn = document.getElementById('camToggleBtn');
+      const video = document.getElementById('videoElement');
 
       if (isScanning) {
-        setStatus("⏳ Cerrando cámara...");
-        if (scanner) {
-          try {
-            await scanner.stop();
-            await scanner.clear();
-          } catch(e) {}
-          scanner = null;
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(track => track.stop());
+          mediaStream = null;
         }
+        video.style.display = 'none';
         isScanning = false;
         if (btn) {
           btn.innerText = "Encender Cámara";
@@ -405,39 +394,31 @@
       }
 
       try {
-        if (!scanner) scanner = new Html5Qrcode("reader");
-        setStatus("⏳ Encendiendo...");
+        setStatus("⏳ Abriendo cámara...");
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } }
+        });
         
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 220, height: 120 } },
-          (text) => { processCode(text); },
-          () => {}
-        );
-
+        video.srcObject = mediaStream;
+        video.style.display = 'block';
+        
         isScanning = true;
         if (btn) {
           btn.innerText = "Apagar";
           btn.className = "btn btn-rose btn-xs";
         }
-        setStatus("🟢 Cámara Activa");
-      } catch(e) {
-        setStatus("❌ Error al abrir cámara");
-        alert("La cámara no se pudo activar. Asegúrate de dar permisos de cámara o recargar.");
+        setStatus("🟢 Cámara Activa (Usa el recuadro para ver el producto o ingresa manual)");
+      } catch (err) {
+        console.error(err);
+        setStatus("❌ Error de permisos");
+        alert("No se pudo acceder a la cámara. Asegúrate de dar permisos de cámara en tu navegador.");
       }
     }
 
-    async function scanImage(input) {
+    function handleImageInput(input) {
       if (!input.files || !input.files[0]) return;
-      if (typeof Html5Qrcode === 'undefined') return alert("Librería no lista.");
-      
-      try {
-        if (!scanner) scanner = new Html5Qrcode("reader");
-        const res = await scanner.scanFile(input.files[0], true);
-        processCode(res);
-      } catch(e) {
-        alert("No se detectó código de barras en la foto.");
-      } finally { input.value = ''; }
+      alert("📷 Foto capturada correctamente. Si es un producto nuevo o de catálogo, puedes tippear su código rápido o buscarlo en el inventario.");
+      input.value = '';
     }
 
     function openInventory() {
@@ -472,4 +453,15 @@
               <span class="badge-stock ${badgeClass}">Stock: ${item.stock}</span>
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
-        
+              <span style="color:var(--emerald); font-weight:bold; font-size:13px;">$${item.price.toFixed(2)}</span>
+              <button class="btn btn-slate btn-xs" onclick="openEditModal('${code}', false)">✏️</button>
+              <button class="btn btn-rose btn-xs" onclick="deleteProd('${code}')">🗑️</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function selectFromCat(code) {
+      processCode(code);
+      closeModal('catMod
