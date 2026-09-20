@@ -512,6 +512,19 @@
      INICIO
   ========================================================= */
 
+  // Captura cualquier error de JavaScript y lo muestra en pantalla,
+  // junto al área de cámara, para poder diagnosticar sin devtools.
+  window.addEventListener('error', function(e) {
+    const el = document.getElementById('camStatus');
+    if (el) el.innerText = '⚠️ Error JS: ' + e.message;
+    console.error('Error capturado:', e.message, e.filename, e.lineno);
+  });
+
+  window.addEventListener('unhandledrejection', function(e) {
+    const el = document.getElementById('camStatus');
+    if (el) el.innerText = '⚠️ Error (promesa): ' + (e.reason && e.reason.message ? e.reason.message : e.reason);
+  });
+
   window.onload = function() {
     try { db = JSON.parse(localStorage.getItem(DB_KEY)) || {}; }
     catch(e) { db = {}; }
@@ -524,6 +537,14 @@
     updateCashSummary();
     updateTodayLabel();
     renderQuickSearch();
+
+    // Diagnóstico inmediato: avisa si la librería de cámara no cargó
+    const camStatusEl = document.getElementById('camStatus');
+    if (typeof Html5Qrcode === 'undefined') {
+      if (camStatusEl) camStatusEl.innerText = '⚠️ Librería de cámara NO cargó (revisa tu conexión o un bloqueador de anuncios/scripts)';
+    } else {
+      if (camStatusEl) camStatusEl.innerText = '📷 Cámara Apagada (librería OK ✓)';
+    }
   };
 
   /* =========================================================
@@ -640,32 +661,4 @@
     if (!p) return;
     editingCode = code;
     document.getElementById('editProdCode').innerText = code;
-    document.getElementById('editProdName').value = p.name;
-    document.getElementById('editProdPrice').value = p.price;
-    document.getElementById('editProdStock').value = p.stock;
-    openModal('editProdModal');
-  }
-
-  function saveEditProd() {
-    if (!editingCode) return;
-
-    const name = document.getElementById('editProdName').value.trim();
-    const price = parseFloat(document.getElementById('editProdPrice').value);
-    const stock = parseInt(document.getElementById('editProdStock').value, 10);
-
-    if (!name) { alert('Escribe el nombre del producto.'); return; }
-    if (isNaN(price) || price < 0) { alert('Precio inválido.'); return; }
-    if (isNaN(stock) || stock < 0) { alert('Stock inválido.'); return; }
-
-    db[editingCode] = { name, price, stock };
-    saveDB();
-
-    const cartItem = cart.find(i => i.code === editingCode);
-    if (cartItem) {
-      cartItem.name = name;
-      cartItem.price = price;
-      if (cartItem.qty > stock) cartItem.qty = stock;
-      if (cartItem.qty <= 0) cart = cart.filter(i => i.code !== editingCode);
-    }
-
-    renderCart
+    document.getElementById('editProdName').value 
